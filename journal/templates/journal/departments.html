@@ -1,0 +1,35 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Отделения{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-building"></i> Отделения колледжа</h4>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for department in departments %}
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ department.name }}</h5>
+                        <p class="card-text">
+                            <i class="bi bi-geo-alt"></i> Адрес: {{ department.address }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Нет отделений.
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

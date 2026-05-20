@@ -11,6 +11,10 @@ class Role(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        verbose_name = "Роль"
+        verbose_name_plural = "Роли"
+
 
 class User(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
@@ -31,3 +35,7 @@ class User(AbstractUser):
         if self.patronymic:
             initials += self.patronymic[0] + '.'
         return f"{self.last_name} {initials}".strip()
+
+    class Meta:
+        verbose_name = "Пользователь"
+        verbose_name_plural = "Пользователи"
