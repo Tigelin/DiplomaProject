@@ -28,7 +28,6 @@
         </form>
 
         {% if selected_group %}
-        <div class="alert alert-info">lesson_numbers: {{ lesson_numbers }}</div>
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <a href="?group_id={{ selected_group.id }}&week_offset={{ week_offset|add:-1 }}" class="btn btn-outline-secondary">
                     <i class="bi bi-chevron-left"></i> Предыдущая неделя
