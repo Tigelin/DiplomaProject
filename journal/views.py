@@ -96,3 +96,7 @@ def schedule_list(request):
         'week_range': week_range,
     }
     return render(request, 'journal/schedule.html', context)
+
+
+def about(request):
+    return render(request, 'journal/about.html')
