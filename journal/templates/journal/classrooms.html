@@ -1,0 +1,46 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Кабинеты{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-door-closed"></i> Кабинеты</h4>
+    </div>
+    <div class="card-body">
+
+        {% regroup classrooms by department as rooms_by_dept %}
+        
+        {% for dept in rooms_by_dept %}
+
+        <div class="mb-4">
+            <h5 class="bg-secondary text-white p-2 rounded">{{ dept.grouper.name }}</h5>
+            <div class="row">
+
+                {% for classroom in dept.list %}
+
+                <div class="col-md-2 col-sm-3 col-4 mb-2">
+                    <div class="border rounded text-center p-2 bg-light">
+                        <i class="bi bi-door-open fs-3"></i>
+                        <div class="mt-1">{{ classroom.number }}</div>
+                    </div>
+                </div>
+
+                {% empty %}
+
+                <div class="col-12 text-muted">Нет кабинетов</div>
+                {% endfor %}
+
+            </div>
+        </div>
+
+        {% empty %}
+
+        <div class="alert alert-info">Нет отделений и кабинетов.</div>
+
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}
