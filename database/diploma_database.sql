@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict db3ertMv1E1P1fPF6gid8zG9NGCIAD87mvFWVrnd5vXX8kJh1JJ2jQCjdNGRn4t
+\restrict ohLIfNnjeMdsRJrhDYqKdcHbgXZmDaMHxjOmg8Cr1Ls2m5R3MilSiCKVCdrNhS4
 
 -- Dumped from database version 16.13
 -- Dumped by pg_dump version 16.13
@@ -717,7 +717,8 @@ CREATE TABLE public.users_user (
     is_active boolean NOT NULL,
     date_joined timestamp with time zone NOT NULL,
     phone character varying(20) NOT NULL,
-    role_id bigint
+    role_id bigint,
+    patronymic character varying(100) NOT NULL
 );
 
 
@@ -916,6 +917,37 @@ COPY public.auth_permission (id, name, content_type_id, codename) FROM stdin;
 --
 
 COPY public.django_admin_log (id, action_time, object_id, object_repr, action_flag, change_message, content_type_id, user_id) FROM stdin;
+1	2026-05-20 14:33:46.71513+10	2	Vorobyov	1	[{"added": {}}]	7	1
+2	2026-05-20 14:36:51.364996+10	2	Vorobyov	2	[{"changed": {"fields": ["First name", "Last name", "Staff status", "Role", "\\u041e\\u0442\\u0447\\u0435\\u0441\\u0442\\u0432\\u043e"]}}]	7	1
+3	2026-05-20 14:37:12.460529+10	1	Воробьев Николай Анатольевич	1	[{"added": {}}]	22	1
+4	2026-05-20 14:47:35.355462+10	1	Каб. 1 (Экономики и сервиса)	1	[{"added": {}}]	14	1
+5	2026-05-20 14:47:43.553336+10	2	Каб. 4 (Экономики и сервиса)	1	[{"added": {}}]	14	1
+6	2026-05-20 14:47:48.929204+10	3	Каб. 103 (Экономики и сервиса)	1	[{"added": {}}]	14	1
+7	2026-05-20 14:48:00.233137+10	4	Каб. 20 (Механическое)	1	[{"added": {}}]	14	1
+8	2026-05-20 14:48:06.054102+10	5	Каб. 21 (Механическое)	1	[{"added": {}}]	14	1
+9	2026-05-20 14:48:55.048891+10	1	Основы алгоритмизации и программирования	1	[{"added": {}}]	10	1
+10	2026-05-20 14:49:08.089061+10	2	Разработка мобильных приложений	1	[{"added": {}}]	10	1
+11	2026-05-20 14:49:23.521856+10	3	Основы программирования	1	[{"added": {}}]	10	1
+12	2026-05-20 14:49:51.385798+10	4	Веб-разработка	1	[{"added": {}}]	10	1
+13	2026-05-20 14:50:22.312008+10	1	1115 (2025)	1	[{"added": {}}]	15	1
+14	2026-05-20 14:50:32.093289+10	2	1125 (2024)	1	[{"added": {}}]	15	1
+15	2026-05-20 14:50:40.224051+10	3	1135 (2023)	1	[{"added": {}}]	15	1
+16	2026-05-20 14:51:12.125223+10	4	1145 (2022)	1	[{"added": {}}]	15	1
+17	2026-05-20 14:51:25.070063+10	5	1731 (2023)	1	[{"added": {}}]	15	1
+18	2026-05-20 14:51:47.56484+10	5	Чемпионатное движение	1	[{"added": {}}]	10	1
+19	2026-05-20 14:53:33.173532+10	3	Pushkin	1	[{"added": {}}]	7	1
+20	2026-05-20 14:54:02.676455+10	3	Stenly	2	[{"changed": {"fields": ["Username", "First name", "Last name", "Staff status"]}}]	7	1
+21	2026-05-20 14:55:11.089845+10	4	Madhowl	1	[{"added": {}}]	7	1
+22	2026-05-20 14:55:29.018604+10	4	Madhowl	2	[{"changed": {"fields": ["First name", "Last name", "Staff status"]}}]	7	1
+23	2026-05-20 14:55:58.105031+10	2	Bronzobor0d	2	[{"changed": {"fields": ["Username"]}}]	7	1
+24	2026-05-20 14:56:11.065555+10	2	Побежимов Михаил Валентинович	1	[{"added": {}}]	22	1
+25	2026-05-20 14:56:14.454135+10	3	Анатольевич Алексей Анатольевич	1	[{"added": {}}]	22	1
+26	2026-05-20 14:56:43.504357+10	3	Stenly	2	[{"changed": {"fields": ["Last name"]}}]	7	1
+27	2026-05-20 14:57:11.997155+10	1	Основы алгоритмизации и программирования - 1125	1	[{"added": {}}]	16	1
+28	2026-05-20 14:57:19.581166+10	2	Разработка мобильных приложений - 1135	1	[{"added": {}}]	16	1
+29	2026-05-20 14:57:26.56414+10	3	Веб-разработка - 1145	1	[{"added": {}}]	16	1
+30	2026-05-20 14:57:33.257433+10	4	Чемпионатное движение - 1731	1	[{"added": {}}]	16	1
+31	2026-05-20 14:58:21.413452+10	5	Основы программирования - 1115	1	[{"added": {}}]	16	1
 \.
 
 
@@ -976,6 +1008,8 @@ COPY public.django_migrations (id, app, name, applied) FROM stdin;
 18	admin	0003_logentry_add_action_flag_choices	2026-05-19 13:30:08.693047+10
 19	sessions	0001_initial	2026-05-19 13:30:08.867592+10
 20	journal	0001_initial	2026-05-20 12:23:56.722709+10
+21	users	0002_user_patronymic	2026-05-20 13:28:37.102274+10
+22	users	0003_alter_role_options_alter_user_options	2026-05-20 14:33:02.476881+10
 \.
 
 
@@ -1014,6 +1048,11 @@ COPY public.journal_attendancetype (id, name) FROM stdin;
 --
 
 COPY public.journal_classroom (id, number, department_id) FROM stdin;
+1	1	1
+2	4	1
+3	103	1
+4	20	4
+5	21	4
 \.
 
 
@@ -1043,6 +1082,11 @@ COPY public.journal_department (id, name, address) FROM stdin;
 --
 
 COPY public.journal_discipline (id, plan_id, group_id, teacher_id) FROM stdin;
+1	1	2	3
+2	2	3	1
+3	4	4	2
+4	5	5	1
+5	3	1	1
 \.
 
 
@@ -1051,6 +1095,11 @@ COPY public.journal_discipline (id, plan_id, group_id, teacher_id) FROM stdin;
 --
 
 COPY public.journal_disciplineplan (id, name, total_hours) FROM stdin;
+1	Основы алгоритмизации и программирования	100
+2	Разработка мобильных приложений	74
+3	Основы программирования	90
+4	Веб-разработка	80
+5	Чемпионатное движение	36
 \.
 
 
@@ -1067,6 +1116,11 @@ COPY public.journal_grade (id, value, created_at, student_id, task_id) FROM stdi
 --
 
 COPY public.journal_group (id, name, year, department_id) FROM stdin;
+1	1115	2025	1
+2	1125	2024	1
+3	1135	2023	1
+4	1145	2022	1
+5	1731	2023	4
 \.
 
 
@@ -1137,6 +1191,9 @@ COPY public.journal_task (id, name, lesson_id) FROM stdin;
 --
 
 COPY public.journal_teacher (id, user_id) FROM stdin;
+1	2
+2	4
+3	3
 \.
 
 
@@ -1155,8 +1212,11 @@ COPY public.users_role (id, name) FROM stdin;
 -- Data for Name: users_user; Type: TABLE DATA; Schema: public; Owner: journal_user
 --
 
-COPY public.users_user (id, password, last_login, is_superuser, username, first_name, last_name, email, is_staff, is_active, date_joined, phone, role_id) FROM stdin;
-1	pbkdf2_sha256$1000000$KdHDtwMaxfB0kNAeuvMxbb$61Hdn0xa5WdIWTiBK5Min0yvEz1x4/jamif07/L8GT0=	2026-05-19 13:38:13.652513+10	t	admin			admin@ppk.ru	t	t	2026-05-19 13:33:39.553262+10		1
+COPY public.users_user (id, password, last_login, is_superuser, username, first_name, last_name, email, is_staff, is_active, date_joined, phone, role_id, patronymic) FROM stdin;
+1	pbkdf2_sha256$1000000$KdHDtwMaxfB0kNAeuvMxbb$61Hdn0xa5WdIWTiBK5Min0yvEz1x4/jamif07/L8GT0=	2026-05-19 13:38:13.652513+10	t	admin			admin@ppk.ru	t	t	2026-05-19 13:33:39.553262+10		1	
+4	pbkdf2_sha256$1000000$9iIqZsDUnmnaqn6XePZryM$V74iCJykqJ40e1wAoSv2YnQREvcjWKvqejXO8NUvXIA=	\N	f	Madhowl	Михаил	Побежимов		t	t	2026-05-20 14:55:10+10		2	Валентинович
+2	pbkdf2_sha256$1000000$JIoG5742tMCJj5fkMErPzD$0IBy6nXeIGhrzM3AjJI+DmVHYMJSdS5+wBVu0A05qPs=	\N	f	Bronzobor0d	Николай	Воробьев		t	t	2026-05-20 14:33:46+10		2	Анатольевич
+3	pbkdf2_sha256$1000000$emaL3mzcZGCweklg8auZ1E$H5oOAVBhc68Uzq9sM4b4/IHD97zPe5/zVmeKjY8QbIQ=	\N	f	Stenly	Алексей	Пушкин		t	t	2026-05-20 14:53:32+10		2	Анатольевич
 \.
 
 
@@ -1201,7 +1261,7 @@ SELECT pg_catalog.setval('public.auth_permission_id_seq', 96, true);
 -- Name: django_admin_log_id_seq; Type: SEQUENCE SET; Schema: public; Owner: journal_user
 --
 
-SELECT pg_catalog.setval('public.django_admin_log_id_seq', 1, false);
+SELECT pg_catalog.setval('public.django_admin_log_id_seq', 31, true);
 
 
 --
@@ -1215,7 +1275,7 @@ SELECT pg_catalog.setval('public.django_content_type_id_seq', 24, true);
 -- Name: django_migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: journal_user
 --
 
-SELECT pg_catalog.setval('public.django_migrations_id_seq', 20, true);
+SELECT pg_catalog.setval('public.django_migrations_id_seq', 22, true);
 
 
 --
@@ -1236,7 +1296,7 @@ SELECT pg_catalog.setval('public.journal_attendancetype_id_seq', 5, true);
 -- Name: journal_classroom_id_seq; Type: SEQUENCE SET; Schema: public; Owner: journal_user
 --
 
-SELECT pg_catalog.setval('public.journal_classroom_id_seq', 1, false);
+SELECT pg_catalog.setval('public.journal_classroom_id_seq', 5, true);
 
 
 --
@@ -1257,14 +1317,14 @@ SELECT pg_catalog.setval('public.journal_department_id_seq', 5, true);
 -- Name: journal_discipline_id_seq; Type: SEQUENCE SET; Schema: public; Owner: journal_user
 --
 
-SELECT pg_catalog.setval('public.journal_discipline_id_seq', 1, false);
+SELECT pg_catalog.setval('public.journal_discipline_id_seq', 5, true);
 
 
 --
 -- Name: journal_disciplineplan_id_seq; Type: SEQUENCE SET; Schema: public; Owner: journal_user
 --
 
-SELECT pg_catalog.setval('public.journal_disciplineplan_id_seq', 1, false);
+SELECT pg_catalog.setval('public.journal_disciplineplan_id_seq', 5, true);
 
 
 --
@@ -1278,7 +1338,7 @@ SELECT pg_catalog.setval('public.journal_grade_id_seq', 1, false);
 -- Name: journal_group_id_seq; Type: SEQUENCE SET; Schema: public; Owner: journal_user
 --
 
-SELECT pg_catalog.setval('public.journal_group_id_seq', 1, false);
+SELECT pg_catalog.setval('public.journal_group_id_seq', 5, true);
 
 
 --
@@ -1334,7 +1394,7 @@ SELECT pg_catalog.setval('public.journal_task_id_seq', 1, false);
 -- Name: journal_teacher_id_seq; Type: SEQUENCE SET; Schema: public; Owner: journal_user
 --
 
-SELECT pg_catalog.setval('public.journal_teacher_id_seq', 1, false);
+SELECT pg_catalog.setval('public.journal_teacher_id_seq', 3, true);
 
 
 --
@@ -1355,7 +1415,7 @@ SELECT pg_catalog.setval('public.users_user_groups_id_seq', 1, false);
 -- Name: users_user_id_seq; Type: SEQUENCE SET; Schema: public; Owner: journal_user
 --
 
-SELECT pg_catalog.setval('public.users_user_id_seq', 1, true);
+SELECT pg_catalog.setval('public.users_user_id_seq', 4, true);
 
 
 --
@@ -2191,5 +2251,5 @@ ALTER TABLE ONLY public.users_user_user_permissions
 -- PostgreSQL database dump complete
 --
 
-\unrestrict db3ertMv1E1P1fPF6gid8zG9NGCIAD87mvFWVrnd5vXX8kJh1JJ2jQCjdNGRn4t
+\unrestrict ohLIfNnjeMdsRJrhDYqKdcHbgXZmDaMHxjOmg8Cr1Ls2m5R3MilSiCKVCdrNhS4
 
