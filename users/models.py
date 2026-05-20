@@ -15,6 +15,19 @@ class Role(models.Model):
 class User(AbstractUser):
     role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
     phone = models.CharField(max_length=20, blank=True)
+    patronymic = models.CharField(max_length=100, blank=True, verbose_name="Отчество")
 
     def __str__(self):
         return self.username
+
+    def get_full_name(self):
+        parts = [self.last_name, self.first_name, self.patronymic]
+        return ' '.join([p for p in parts if p])
+
+    def get_short_name(self):
+        initials = ''
+        if self.first_name:
+            initials += self.first_name[0] + '.'
+        if self.patronymic:
+            initials += self.patronymic[0] + '.'
+        return f"{self.last_name} {initials}".strip()
