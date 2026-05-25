@@ -1,0 +1,37 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Обратная связь{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-envelope"></i> Обратная связь</h4>
+    </div>
+    <div class="card-body">
+        <p class="mb-4">Заполните форму, и мы свяжемся с вами в ближайшее время.</p>
+        
+        <form method="post">
+
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label for="name" class="form-label">Ваше имя <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="name" name="name" required>
+            </div>
+            <div class="mb-3">
+                <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="mb-3">
+                <label for="message" class="form-label">Сообщение <span class="text-danger">*</span></label>
+                <textarea class="form-control" id="message" name="message" rows="5" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-send"></i> Отправить
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

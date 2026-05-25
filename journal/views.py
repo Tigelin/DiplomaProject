@@ -1,12 +1,13 @@
 from django.shortcuts import render
 
 # Create your views here.
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from datetime import datetime, timedelta
+from django.contrib import messages
 from .models import (
     Teacher, Department, Group, Discipline,
-    Classroom, Schedule
+    Classroom, Schedule, ContactMessage, MessageStatus
 )
 
 def home(request):
@@ -100,3 +101,23 @@ def schedule_list(request):
 
 def about(request):
     return render(request, 'journal/about.html')
+
+
+def contact(request):
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        email = request.POST.get('email')
+        message_text = request.POST.get('message')
+
+        new_status, _ = MessageStatus.objects.get_or_create(name='Новое')
+
+        ContactMessage.objects.create(
+            name=name,
+            email=email,
+            message=message_text,
+            status=new_status
+        )
+        messages.success(request, 'Ваше сообщение отправлено! Мы свяжемся с вами.')
+        return redirect('contact')
+
+    return render(request, 'journal/contact.html')
