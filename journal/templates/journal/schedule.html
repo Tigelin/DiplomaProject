@@ -19,20 +19,16 @@
         <h4 class="mb-0"><i class="bi bi-calendar-week"></i> Расписание занятий</h4>
     </div>
     <div class="card-body">
-        <form method="get" class="row g-3 mb-4">
+        <form method="get" class="row g-3 mb-4" id="scheduleForm">
             <div class="col-md-4">
                 <label class="form-label">Выберите группу:</label>
                 <select name="group_id" class="form-select">
                     <option value="">-- Выберите группу --</option>
-
                     {% for group in groups %}
-
                         <option value="{{ group.id }}" {% if selected_group.id == group.id %}selected{% endif %}>
                             {{ group.name }}
                         </option>
-
                     {% endfor %}
-
                 </select>
             </div>
             <div class="col-md-2 d-flex align-items-end">
@@ -50,13 +46,9 @@
                 </a>
                 <div class="text-center">
                     <strong>{{ week_range }}</strong>
-
                     {% if week_offset == 0 %}
-
                         <span class="badge bg-success ms-2">Текущая неделя</span>
-
                     {% endif %}
-
                 </div>
                 <a href="?group_id={{ selected_group.id }}&week_offset={{ week_offset|add:1 }}" class="btn btn-outline-secondary">
                     Следующая неделя <i class="bi bi-chevron-right"></i>
@@ -64,84 +56,59 @@
             </div>
 
             {% if week_offset != 0 %}
-
                 <div class="text-center mb-3">
                     <a href="?group_id={{ selected_group.id }}&week_offset=0" class="btn btn-sm btn-primary">
                         <i class="bi bi-calendar-week"></i> Вернуться к текущей неделе
                     </a>
                 </div>
-
             {% endif %}
 
             <div class="table-responsive">
-                <table class="table table-bordered text-center align-middle" style="table-layout: fixed; width: 100%;">
+                <table class="table table-bordered text-center">
                     <thead class="table-dark">
                         <tr>
-                            <th style="width: 70px;">Пара</th>
-
+                            <th style="min-width: 80px">Пара</th>
                             {% for day, date in week_schedule %}
-
-                                <th style="width: calc((100% - 70px) / 7);">
-                                    {{ day }}<br>
-                                    <small>{{ date|date:"d.m.Y" }}</small>
-
-                                    {% if forloop.counter0 == today_index %}
-
+                                {% if forloop.counter0 == today_index %}
+                                    <th class="bg-warning text-dark">
+                                        {{ day }}<br>
+                                        <small>{{ date|date:"d.m.Y" }}</small>
                                         <br><span class="badge bg-danger">Сегодня</span>
-
-                                    {% endif %}
-
-                                </th>
-
+                                    </th>
+                                {% else %}
+                                    <th>
+                                        {{ day }}<br>
+                                        <small class="fw-normal">{{ date|date:"d.m.Y" }}</small>
+                                    </th>
+                                {% endif %}
                             {% endfor %}
-
                         </tr>
                     </thead>
                     <tbody>
-
                         {% for num in lesson_numbers %}
-
                         <tr>
-                            <th class="table-light" style="width: 70px;">{{ num|to_roman }}</th>
-
+                            <th class="bg-light">{{ num|to_roman }}</th>
                             {% for i in range_0_6 %}
-
-                                <td style="word-wrap: break-word; word-break: break-word;" class="{% if i == today_index %}table-info{% endif %}">
-
+                                <td class="align-middle {% if i == today_index %}bg-info bg-opacity-25{% endif %}">
                                     {% with schedule_grid|get_by_key:i|get_by_key:num as s %}
-
                                         {% if s %}
-
-                                            <div class="fw-bold">{{ s.discipline.plan.name }}</div>
-                                            <div class="small text-muted">{{ s.classroom.number }}</div>
+                                            <strong>{{ s.discipline.plan.name }}</strong><br>
+                                            <small class="text-muted">{{ s.classroom.number }}</small>
                                             <div class="small text-secondary mt-1">
-                                                <i class="bi bi-person"></i>
                                                 {{ s.discipline.teacher.user.last_name }}
                                                 {{ s.discipline.teacher.user.first_name|slice:":1" }}.
-
                                                 {% if s.discipline.teacher.user.patronymic %}
-
                                                     {{ s.discipline.teacher.user.patronymic|slice:":1" }}.
                                                 {% endif %}
-
                                             </div>
-
                                         {% else %}
-
                                             <span class="text-muted">—</span>
-
                                         {% endif %}
-
                                     {% endwith %}
-
                                 </td>
-
                             {% endfor %}
-
                         </tr>
-
                         {% endfor %}
-
                     </tbody>
                 </table>
             </div>
