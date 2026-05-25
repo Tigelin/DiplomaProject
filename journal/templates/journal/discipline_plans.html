@@ -2,6 +2,13 @@
 
 {% block title %}Планы дисциплин{% endblock %}
 
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item active">Планы дисциплин</li>
+
+{% endblock %}
+
 {% block content %}
 
 <div class="card">

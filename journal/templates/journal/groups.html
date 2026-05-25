@@ -2,6 +2,13 @@
 
 {% block title %}Группы{% endblock %}
 
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item active">Группы</li>
+
+{% endblock %}
+
 {% block content %}
 
 <div class="card">
