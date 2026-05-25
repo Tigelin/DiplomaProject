@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from django.contrib import messages
 from .models import (
     Teacher, Department, Group, Discipline,
-    Classroom, Schedule, ContactMessage, MessageStatus
+    Classroom, Schedule, ContactMessage, MessageStatus,
+    DisciplinePlan
 )
 
 def home(request):
@@ -28,9 +29,15 @@ def groups_list(request):
     groups = Group.objects.select_related('department').all()
     return render(request, 'journal/groups.html', {'groups': groups})
 
+
 def disciplines_list(request):
     disciplines = Discipline.objects.select_related('plan', 'group', 'teacher').all()
     return render(request, 'journal/disciplines.html', {'disciplines': disciplines})
+
+
+def discipline_plans_list(request):
+    plans = DisciplinePlan.objects.all().order_by('name')
+    return render(request, 'journal/discipline_plans.html', {'plans': plans})
 
 
 def classrooms_list(request):
