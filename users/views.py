@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from journal.models import Student, Grade
 
 # Create your views here.
 
@@ -74,4 +75,22 @@ def student_profile(request):
 
     return render(request, 'users/student/profile.html', {
         'student': student,
+    })
+
+
+@login_required
+def student_grades(request):
+    try:
+        student = request.user.student
+    except:
+        messages.error(request, 'Профиль студента не найден.')
+        return redirect('home')
+
+    grades = Grade.objects.filter(student=student).select_related(
+        'task__lesson__schedule__discipline__plan'
+    ).order_by('-created_at')
+
+    return render(request, 'users/student/grades.html', {
+        'student': student,
+        'grades': grades,
     })
