@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 
 # Create your views here.
 
@@ -28,3 +29,38 @@ def logout_view(request):
     logout(request)
     messages.success(request, 'Вы успешно вышли из системы.')
     return redirect('home')
+
+
+@login_required
+def dashboard(request):
+    if request.user.role and request.user.role.name == 'Студент':
+        return redirect('student_profile')
+
+    return render(request, 'users/dashboard.html')
+
+
+@login_required
+def student_profile(request):
+    try:
+        student = request.user.student
+    except:
+        messages.error(request, 'Профиль студента не найден.')
+        return redirect('home')
+
+    if request.method == 'POST':
+        user = request.user
+        user.last_name = request.POST.get('last_name')
+        user.first_name = request.POST.get('first_name')
+        user.patronymic = request.POST.get('patronymic')
+        user.phone = request.POST.get('phone')
+        user.save()
+
+        student.special_number = request.POST.get('special_number')
+        student.save()
+
+        messages.success(request, 'Профиль успешно обновлён!')
+        return redirect('student_profile')
+
+    return render(request, 'users/student/profile.html', {
+        'student': student,
+    })

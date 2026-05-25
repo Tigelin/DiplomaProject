@@ -7,7 +7,7 @@
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
-           <ul class="navbar-nav ms-auto">
+            <ul class="navbar-nav ms-auto">
                 <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">
                         <i class="bi bi-house"></i> Главная
@@ -61,11 +61,16 @@
 
                 {% if user.is_authenticated %}
 
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'logout' %}">
-                            <i class="bi bi-box-arrow-right"></i> Выход ({{ user.username }})
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-person-circle"></i> {{ user.get_short_name|default:user.username }}
                         </a>
-                    </li>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'dashboard' %}">Личный кабинет</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'logout' %}">Выход</a></li>
+                        </ul>
+                   </li>
 
                 {% else %}
 
