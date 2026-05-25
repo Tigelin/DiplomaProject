@@ -60,26 +60,22 @@
                 </li>
 
                 {% if user.is_authenticated %}
-
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-person-circle"></i> {{ user.get_short_name|default:user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{% url 'dashboard' %}">Личный кабинет</a></li>
+                            <li><a class="dropdown-item" href="{% url 'student_dashboard' %}">
+                                <i class="bi bi-speedometer2"></i> Личный кабинет
+                            </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{% url 'logout' %}">Выход</a></li>
+                            <li><a class="dropdown-item" href="{% url 'logout' %}">
+                                <i class="bi bi-box-arrow-right"></i> Выход
+                            </a></li>
                         </ul>
-                   </li>
-
-                {% else %}
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}" href="{% url 'login' %}">
-                            <i class="bi bi-box-arrow-in-right"></i> Вход
-                        </a>
                     </li>
-
+                {% else %}
+                    <li class="nav-item"><a class="nav-link" href="{% url 'login' %}">Вход</a></li>
                 {% endif %}
 
             </ul>

@@ -34,9 +34,20 @@ def logout_view(request):
 @login_required
 def dashboard(request):
     if request.user.role and request.user.role.name == 'Студент':
-        return redirect('student_profile')
+        return redirect('student_dashboard')
 
     return render(request, 'users/dashboard.html')
+
+
+@login_required
+def student_dashboard(request):
+    try:
+        student = request.user.student
+    except:
+        messages.error(request, 'Профиль студента не найден.')
+        return redirect('home')
+
+    return render(request, 'users/student/dashboard.html', {'student': student})
 
 
 @login_required

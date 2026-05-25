@@ -5,7 +5,8 @@
 {% block breadcrumbs %}
 
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
-    <li class="breadcrumb-item active">Личный кабинет</li>
+    <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Личный кабинет</a></li>
+    <li class="breadcrumb-item active">Мой профиль</li>
 
 {% endblock %}
 
