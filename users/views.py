@@ -1,8 +1,8 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Student, Grade, Task, Discipline
+from journal.models import Student, Grade, Task, Discipline, Lesson
 
 # Create your views here.
 
@@ -86,7 +86,11 @@ def student_grades(request):
         messages.error(request, 'Профиль студента не найден.')
         return redirect('home')
 
-    grades = Grade.objects.filter(student=student).select_related(
+    grades = Grade.objects.filter(
+        student=student,
+        task__isnull=False,
+        task__lesson__isnull=False
+    ).select_related(
         'task__lesson__schedule__discipline__plan',
         'task__lesson__schedule'
     ).order_by('task__lesson__schedule__date')
@@ -115,17 +119,17 @@ def student_grades(request):
     for grade in grades:
         discipline_id = grade.task.lesson.schedule.discipline.id
         date = grade.task.lesson.schedule.date
-        matrix[discipline_id][date].append(grade.value)
+        matrix[discipline_id][date].append(grade)
 
     averages = {}
     for discipline_id in disciplines_dict:
         all_grades = []
         for date in sorted_dates:
             for grade in matrix[discipline_id][date]:
-                if grade == 1:
+                if grade.value == 1:
                     all_grades.append(2)
                 else:
-                    all_grades.append(grade)
+                    all_grades.append(grade.value)
         if all_grades:
             avg = sum(all_grades) / len(all_grades)
             averages[discipline_id] = round(avg, 2)
@@ -193,3 +197,32 @@ def student_tasks(request):
         'selected_discipline_id': discipline_id,
     }
     return render(request, 'users/student/tasks.html', context)
+
+
+@login_required
+def lesson_detail(request, lesson_id):
+    try:
+        student = request.user.student
+    except:
+        messages.error(request, 'Профиль студента не найден.')
+        return redirect('home')
+
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    if lesson.schedule.discipline.group != student.group:
+        messages.error(request, 'У вас нет доступа к этому занятию.')
+        return redirect('student_grades')
+
+    tasks = Task.objects.filter(lesson=lesson)
+
+    user_grades = {}
+    for task in tasks:
+        grade = Grade.objects.filter(student=student, task=task).first()
+        user_grades[task.id] = grade.value if grade else None
+
+    context = {
+        'lesson': lesson,
+        'tasks': tasks,
+        'user_grades': user_grades,
+    }
+    return render(request, 'users/student/lesson_detail.html', context)

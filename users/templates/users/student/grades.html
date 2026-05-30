@@ -1,5 +1,4 @@
 {% extends "journal/base.html" %}
-
 {% load dict_extras %}
 
 {% block title %}Мои оценки{% endblock %}
@@ -56,13 +55,13 @@
                                                 {% for grade in grade_list %}
 
                                                     <span class="badge
-                                                        {% if grade == 5 %}bg-dark-green
-                                                        {% elif grade == 4 %}bg-success
-                                                        {% elif grade == 3 %}bg-warning text-dark
-                                                        {% elif grade == 2 %}bg-danger
+                                                        {% if grade.value == 5 %}bg-dark-green
+                                                        {% elif grade.value == 4 %}bg-success
+                                                        {% elif grade.value == 3 %}bg-warning text-dark
+                                                        {% elif grade.value == 2 %}bg-danger
                                                         {% else %}bg-dark text-white
-                                                        {% endif %} mb-1">
-                                                        {{ grade }}
+                                                        {% endif %} mb-1" style="cursor: pointer;" onclick="window.location.href='{% url 'lesson_detail' grade.task.lesson.id %}?from=grades'">
+                                                        {{ grade.value }}
                                                     </span>
 
                                                     {% if not forloop.last %}<br>{% endif %}

@@ -1,0 +1,122 @@
+{% extends "journal/base.html" %}
+
+{% load dict_extras %}
+
+{% block title %}Информация о занятии{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Личный кабинет</a></li>
+
+    {% if request.GET.from == 'tasks' %}
+
+        <li class="breadcrumb-item"><a href="{% url 'student_tasks' %}">Мои задания</a></li>
+
+    {% else %}
+
+        <li class="breadcrumb-item"><a href="{% url 'student_grades' %}">Мои оценки</a></li>
+
+    {% endif %}
+
+    <li class="breadcrumb-item active">Занятие</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-calendar-event"></i> Информация о занятии</h4>
+    </div>
+    <div class="card-body">
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <strong>Дисциплина:</strong> {{ lesson.schedule.discipline.plan.name }}
+            </div>
+            <div class="col-md-6">
+                <strong>Дата:</strong> {{ lesson.schedule.date|date:"d.m.Y" }}
+            </div>
+            <div class="col-md-6">
+                <strong>Пара:</strong> {{ lesson.schedule.lesson_number }}
+            </div>
+            <div class="col-md-6">
+                <strong>Кабинет:</strong> {{ lesson.schedule.classroom.number }}
+            </div>
+            <div class="col-md-6">
+                <strong>Тип занятия:</strong> {{ lesson.lesson_type.name|default:"—" }}
+            </div>
+            <div class="col-md-6">
+                <strong>Преподаватель:</strong> {{ lesson.schedule.discipline.teacher.user.get_full_name }}
+            </div>
+            <div class="col-12 mt-3">
+                <strong>Тема занятия:</strong> {{ lesson.topic|default:"—" }}
+            </div>
+        </div>
+
+        <h5 class="mt-4 mb-3">Задания и оценки</h5>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Задание</th>
+                        <th>Оценка</th>
+                    </tr>
+                </thead>
+                <tbody>
+
+                    {% for task in tasks %}
+
+                        <tr>
+                            <td>{{ task.name }}</td>
+                            <td>
+                                {% with user_grades|get_by_key:task.id as grade %}
+
+                                    {% if grade %}
+
+                                        <span class="badge
+                                            {% if grade == 5 %}bg-dark-green
+                                            {% elif grade == 4 %}bg-success
+                                            {% elif grade == 3 %}bg-warning text-dark
+                                            {% elif grade == 2 %}bg-danger
+                                            {% else %}bg-dark text-white
+                                            {% endif %}">
+                                            {{ grade }}
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="text-muted">—</span>
+
+                                    {% endif %}
+
+                                {% endwith %}
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+            </table>
+        </div>
+
+        {% if request.GET.from == 'tasks' %}
+
+            <a href="{% url 'student_tasks' %}" class="btn btn-secondary mt-3">
+                <i class="bi bi-arrow-left"></i> Назад к заданиям
+            </a>
+
+        {% else %}
+
+            <a href="{% url 'student_grades' %}" class="btn btn-secondary mt-3">
+                <i class="bi bi-arrow-left"></i> Назад к оценкам
+            </a>
+
+        {% endif %}
+        
+    </div>
+</div>
+
+{% endblock %}

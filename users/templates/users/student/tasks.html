@@ -80,7 +80,11 @@
 
                         <tr class="{% if not item.is_completed %}table-danger{% endif %}">
                             <td>{{ item.task.lesson.schedule.discipline.plan.name }}</td>
-                            <td><strong>{{ item.task.name }}</strong></td>
+                            <td>
+                                <a href="{% url 'lesson_detail' item.task.lesson.id %}?from=tasks" class="text-decoration-none">
+                                    <strong>{{ item.task.name }}</strong>
+                                </a>
+                            </td>
                             <td>{{ item.task.lesson.topic|default:"—" }}</td>
                             <td>{{ item.task.lesson.schedule.discipline.teacher.user.get_full_name }}</td>
                             <td>{{ item.task.lesson.schedule.date|date:"d.m.Y" }}</td>
@@ -107,7 +111,7 @@
 
                                 {% endif %}
 
-                            </td>
+                            </tr>
                         </tr>
 
                     {% endfor %}
