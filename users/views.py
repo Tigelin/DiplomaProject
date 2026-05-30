@@ -137,29 +137,41 @@ def student_tasks(request):
     show_all = request.GET.get('show_all', 'false') == 'true'
     discipline_id = request.GET.get('discipline_id', '')
 
-    tasks = Task.objects.filter(
+    grades_dict = {}
+    for grade in Grade.objects.filter(student=student, task__isnull=False):
+        grades_dict[grade.task_id] = grade.value
+
+    completed_task_ids = [task_id for task_id, grade in grades_dict.items() if grade >= 2]
+
+    all_tasks = Task.objects.filter(
         lesson__schedule__discipline__group=student.group
     ).select_related(
         'lesson__schedule__discipline__plan',
         'lesson__schedule__discipline__teacher__user'
     ).distinct().order_by('lesson__schedule__date')
 
-    if not show_all:
-        graded_task_ids = Grade.objects.filter(
-            student=student,
-            task__isnull=False
-        ).values_list('task_id', flat=True)
-
-        tasks = tasks.exclude(id__in=graded_task_ids)
-
     if discipline_id:
-        tasks = tasks.filter(lesson__schedule__discipline__id=discipline_id)
+        all_tasks = all_tasks.filter(lesson__schedule__discipline__id=discipline_id)
+
+    tasks_with_status = []
+    for task in all_tasks:
+        if task.id in grades_dict:
+            grade = grades_dict[task.id]
+            is_completed = grade >= 2
+            tasks_with_status.append({
+                'task': task,
+                'is_completed': is_completed,
+                'grade': grade,
+            })
+
+    if not show_all:
+        tasks_with_status = [t for t in tasks_with_status if not t['is_completed']]
 
     disciplines = Discipline.objects.filter(group=student.group).select_related('plan')
 
     context = {
         'student': student,
-        'tasks': tasks,
+        'tasks_with_status': tasks_with_status,
         'disciplines': disciplines,
         'show_all': show_all,
         'selected_discipline_id': discipline_id,

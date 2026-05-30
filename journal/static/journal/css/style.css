@@ -1,0 +1,23 @@
+.bg-dark-green {
+    background-color: #006400 !important;
+    color: white !important;
+}
+
+.bg-orange {
+    background-color: #fd7e14 !important;
+    color: white !important;
+}
+
+.bg-light-red {
+    background-color: #ffcccc !important;
+    color: #cc0000 !important;
+}
+
+.card-hover {
+    transition: transform 0.2s;
+}
+
+.card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
