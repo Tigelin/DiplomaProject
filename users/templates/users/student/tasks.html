@@ -3,9 +3,11 @@
 {% block title %}Мои задания{% endblock %}
 
 {% block breadcrumbs %}
+
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
     <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Личный кабинет</a></li>
     <li class="breadcrumb-item active">Мои задания</li>
+
 {% endblock %}
 
 {% block content %}
@@ -21,11 +23,15 @@
                 <label class="form-label">Дисциплина:</label>
                 <select name="discipline_id" class="form-select" onchange="this.form.submit()">
                     <option value="">-- Все дисциплины --</option>
+
                     {% for discipline in disciplines %}
+
                         <option value="{{ discipline.id }}" {% if selected_discipline_id == discipline.id|stringformat:"s" %}selected{% endif %}>
                             {{ discipline.plan.name }}
                         </option>
+
                     {% endfor %}
+
                 </select>
             </div>
 
@@ -42,11 +48,17 @@
         <div class="alert alert-info">
             <i class="bi bi-info-circle"></i>
             Найдено заданий: <strong>{{ tasks_with_status|length }}</strong>
+
             {% if not show_all %}
+
                 (только несданные)
+
             {% else %}
+
                 (все)
+
             {% endif %}
+
         </div>
 
         <div class="table-responsive">
@@ -63,43 +75,43 @@
                     </tr>
                 </thead>
                 <tbody>
+
                     {% for item in tasks_with_status %}
-                    <tr class="{% if not item.is_completed %}table-danger{% endif %}">
-                        <td>{{ item.task.lesson.schedule.discipline.plan.name }}</td>
-                        <td><strong>{{ item.task.name }}</strong></td>
-                        <td>{{ item.task.lesson.topic|default:"—" }}</td>
-                        <td>{{ item.task.lesson.schedule.discipline.teacher.user.get_full_name }}</td>
-                        <td>{{ item.task.lesson.schedule.date|date:"d.m.Y" }}</td>
-                        <td>
-                            <span class="badge
-                                {% if item.grade == 5 %}bg-success
-                                {% elif item.grade == 4 %}bg-success
-                                {% elif item.grade == 3 %}bg-warning text-dark
-                                {% else %}bg-danger
-                                {% endif %}">
-                                {{ item.grade }}
-                            </span>
-                        </td>
-                        <td>
-                            {% if item.is_completed %}
-                                <span class="badge bg-success">Сдано</span>
-                            {% else %}
-                                <span class="badge bg-danger">Не сдано</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="7" class="text-center">
-                            <i class="bi bi-info-circle"></i>
-                            {% if not show_all %}
-                                Нет несданных заданий.
-                            {% else %}
-                                Нет заданий с оценками.
-                            {% endif %}
-                        </td>
-                    </tr>
+
+                        <tr class="{% if not item.is_completed %}table-danger{% endif %}">
+                            <td>{{ item.task.lesson.schedule.discipline.plan.name }}</td>
+                            <td><strong>{{ item.task.name }}</strong></td>
+                            <td>{{ item.task.lesson.topic|default:"—" }}</td>
+                            <td>{{ item.task.lesson.schedule.discipline.teacher.user.get_full_name }}</td>
+                            <td>{{ item.task.lesson.schedule.date|date:"d.m.Y" }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if item.grade == 5 %}bg-dark-green
+                                    {% elif item.grade == 4 %}bg-success
+                                    {% elif item.grade == 3 %}bg-warning text-dark
+                                    {% elif item.grade == 2 %}bg-danger
+                                    {% else %}bg-danger
+                                    {% endif %}">
+                                    {{ item.grade }}
+                                </span>
+                            </td>
+                            <td>
+
+                                {% if item.is_completed %}
+
+                                    <span class="badge bg-success">Сдано</span>
+
+                                {% else %}
+
+                                    <span class="badge bg-danger">Не сдано</span>
+
+                                {% endif %}
+
+                            </td>
+                        </tr>
+
                     {% endfor %}
+
                 </tbody>
             </table>
         </div>
