@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Student, Grade
+from journal.models import Student, Grade, Task, Discipline
 
 # Create your views here.
 
@@ -94,3 +94,44 @@ def student_grades(request):
         'student': student,
         'grades': grades,
     })
+
+
+@login_required
+def student_tasks(request):
+    try:
+        student = request.user.student
+    except:
+        messages.error(request, 'Профиль студента не найден.')
+        return redirect('home')
+
+    show_all = request.GET.get('show_all', 'false') == 'true'
+    discipline_id = request.GET.get('discipline_id', '')
+
+    tasks = Task.objects.filter(
+        lesson__schedule__discipline__group=student.group
+    ).select_related(
+        'lesson__schedule__discipline__plan',
+        'lesson__schedule__discipline__teacher__user'
+    ).distinct().order_by('lesson__schedule__date')
+
+    if not show_all:
+        graded_task_ids = Grade.objects.filter(
+            student=student,
+            task__isnull=False
+        ).values_list('task_id', flat=True)
+
+        tasks = tasks.exclude(id__in=graded_task_ids)
+
+    if discipline_id:
+        tasks = tasks.filter(lesson__schedule__discipline__id=discipline_id)
+
+    disciplines = Discipline.objects.filter(group=student.group).select_related('plan')
+
+    context = {
+        'student': student,
+        'tasks': tasks,
+        'disciplines': disciplines,
+        'show_all': show_all,
+        'selected_discipline_id': discipline_id,
+    }
+    return render(request, 'users/student/tasks.html', context)
