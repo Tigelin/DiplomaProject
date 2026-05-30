@@ -117,11 +117,27 @@ def student_grades(request):
         date = grade.task.lesson.schedule.date
         matrix[discipline_id][date].append(grade.value)
 
+    averages = {}
+    for discipline_id in disciplines_dict:
+        all_grades = []
+        for date in sorted_dates:
+            for grade in matrix[discipline_id][date]:
+                if grade == 1:
+                    all_grades.append(2)
+                else:
+                    all_grades.append(grade)
+        if all_grades:
+            avg = sum(all_grades) / len(all_grades)
+            averages[discipline_id] = round(avg, 2)
+        else:
+            averages[discipline_id] = None
+
     context = {
         'student': student,
         'disciplines': disciplines_dict.items(),
         'dates': sorted_dates,
         'matrix': matrix,
+        'averages': averages,
     }
     return render(request, 'users/student/grades.html', context)
 
