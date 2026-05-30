@@ -87,13 +87,43 @@ def student_grades(request):
         return redirect('home')
 
     grades = Grade.objects.filter(student=student).select_related(
-        'task__lesson__schedule__discipline__plan'
-    ).order_by('-created_at')
+        'task__lesson__schedule__discipline__plan',
+        'task__lesson__schedule'
+    ).order_by('task__lesson__schedule__date')
 
-    return render(request, 'users/student/grades.html', {
+    disciplines_dict = {}
+    for grade in grades:
+        discipline_name = grade.task.lesson.schedule.discipline.plan.name
+        discipline_id = grade.task.lesson.schedule.discipline.id
+        if discipline_id not in disciplines_dict:
+            disciplines_dict[discipline_id] = discipline_name
+
+    dates_dict = {}
+    for grade in grades:
+        date = grade.task.lesson.schedule.date
+        if date not in dates_dict:
+            dates_dict[date] = date
+
+    sorted_dates = sorted(dates_dict.keys())
+
+    matrix = {}
+    for discipline_id in disciplines_dict:
+        matrix[discipline_id] = {}
+        for date in sorted_dates:
+            matrix[discipline_id][date] = []
+
+    for grade in grades:
+        discipline_id = grade.task.lesson.schedule.discipline.id
+        date = grade.task.lesson.schedule.date
+        matrix[discipline_id][date].append(grade.value)
+
+    context = {
         'student': student,
-        'grades': grades,
-    })
+        'disciplines': disciplines_dict.items(),
+        'dates': sorted_dates,
+        'matrix': matrix,
+    }
+    return render(request, 'users/student/grades.html', context)
 
 
 @login_required

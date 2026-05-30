@@ -1,13 +1,12 @@
 {% extends "journal/base.html" %}
+{% load dict_extras %}
 
 {% block title %}Мои оценки{% endblock %}
 
 {% block breadcrumbs %}
-
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
     <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Личный кабинет</a></li>
     <li class="breadcrumb-item active">Мои оценки</li>
-
 {% endblock %}
 
 {% block content %}
@@ -17,40 +16,47 @@
         <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill"></i> Мои оценки</h4>
     </div>
     <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Дисциплина</th>
-                        <th>Тема занятия</th>
-                        <th>Задание</th>
-                        <th>Оценка</th>
-                        <th>Дата</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for grade in grades %}
-                    <tr>
-                        <td>{{ grade.task.lesson.schedule.discipline.plan.name }}</td>
-                        <td>{{ grade.task.lesson.topic|default:"—" }}</td>
-                        <td>{{ grade.task.name }}</td>
-                        <td>
-                            <span class="badge {% if grade.value >= 4 %}bg-success{% elif grade.value == 3 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
-                                {{ grade.value }}
-                            </span>
-                        </td>
-                        <td>{{ grade.created_at|date:"d.m.Y" }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center">
-                            <i class="bi bi-info-circle"></i> У вас пока нет оценок.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        {% if dates %}
+            <div class="table-responsive">
+                <table class="table table-bordered text-center align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="min-width: 150px">Дисциплина</th>
+                            {% for date in dates %}
+                                <th style="min-width: 100px">{{ date|date:"d.m.Y" }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for discipline_id, discipline_name in disciplines %}
+                            <tr>
+                                <th class="bg-light text-start">{{ discipline_name }}</th>
+                                {% for date in dates %}
+                                    <td>
+                                        {% with matrix|get_by_key:discipline_id|get_by_key:date as grade_list %}
+                                            {% if grade_list %}
+                                                {% for grade in grade_list %}
+                                                    <span class="badge {% if grade >= 4 %}bg-success{% elif grade == 3 %}bg-warning text-dark{% else %}bg-danger{% endif %} mb-1">
+                                                        {{ grade }}
+                                                    </span>
+                                                    {% if not forloop.last %}<br>{% endif %}
+                                                {% endfor %}
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info text-center">
+                <i class="bi bi-info-circle"></i> У вас пока нет оценок.
+            </div>
+        {% endif %}
     </div>
 </div>
 
