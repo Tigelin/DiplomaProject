@@ -1,0 +1,156 @@
+{% extends "journal/base.html" %}
+{% load dict_extras %}
+
+{% block title %}Моя посещаемость{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Личный кабинет</a></li>
+    <li class="breadcrumb-item active">Моя посещаемость</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-person-check"></i> Моя посещаемость</h4>
+    </div>
+    <div class="card-body">
+
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center bg-success text-white">
+                    <div class="card-body">
+                        <h3>{{ present }}</h3>
+                        <p class="mb-0">Присутствовал</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-danger text-white">
+                    <div class="card-body">
+                        <h3>{{ absent }}</h3>
+                        <p class="mb-0">Отсутствовал</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-warning text-dark">
+                    <div class="card-body">
+                        <h3>{{ total }}</h3>
+                        <p class="mb-0">Всего занятий</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center bg-info text-white">
+                    <div class="card-body">
+                        <h3>{{ attendance_percent }}%</h3>
+                        <p class="mb-0">Общая посещаемость</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <small class="text-muted">
+                Обозначения:
+                <span class="text-success">✓</span> - Присутствовал,
+                <span class="text-warning">О</span> - Опоздал,
+                <span class="text-primary">Б</span> - Отсутствовал по болезни,
+                <span class="text-orange">УП</span> - Отсутствовал по уважительной причине,
+                <span class="text-danger">НП</span> - Отсутствовал без причины
+            </small>
+        </div>
+
+        {% if dates %}
+
+            <div class="table-responsive">
+                <table class="table table-bordered text-center align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="min-width: 150px">Дисциплина</th>
+
+                            {% for date in dates %}
+
+                                <th style="min-width: 80px">{{ date|date:"d.m.Y" }}</th>
+
+                            {% endfor %}
+
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        {% for discipline_id, discipline_name in disciplines %}
+
+                            <tr>
+                                <th class="bg-light text-start">{{ discipline_name }}</th>
+
+                                {% for date in dates %}
+
+                                    <td>
+
+                                        {% with matrix|get_by_key:discipline_id|get_by_key:date as status %}
+
+                                            {% if status %}
+
+                                                {% if status == 'Присутствовал' %}
+
+                                                    <span class="text-success fw-bold">✓</span>
+
+                                                {% elif status == 'Опоздал' %}
+
+                                                    <span class="text-warning fw-bold">О</span>
+
+                                                {% elif status == 'Отсутствовал по болезни' %}
+
+                                                    <span class="text-primary fw-bold">Б</span>
+
+                                                {% elif status == 'Отсутствовал по уважительной причине' %}
+
+                                                    <span class="text-orange fw-bold">УП</span>
+
+                                                {% elif status == 'Отсутствовал без причины' %}
+
+                                                    <span class="text-danger fw-bold">НП</span>
+
+                                                {% endif %}
+
+                                            {% else %}
+
+                                                <span class="text-muted">—</span>
+
+                                            {% endif %}
+
+                                        {% endwith %}
+
+                                    </td>
+
+                                {% endfor %}
+
+                            </td>
+
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+
+            <div class="alert alert-info text-center">
+                <i class="bi bi-info-circle"></i> Нет записей о посещаемости.
+            </div>
+
+        {% endif %}
+        
+        <a href="{% url 'student_dashboard' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад в кабинет
+        </a>
+        
+    </div>
+</div>
+
+{% endblock %}

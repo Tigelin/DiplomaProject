@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Student, Grade, Task, Discipline, Lesson, LessonFile
+from journal.models import Student, Grade, Task, Discipline, Lesson, LessonFile, Attendance
 
 # Create your views here.
 
@@ -232,3 +232,61 @@ def lesson_detail(request, lesson_id):
         'files': files,
     }
     return render(request, 'users/student/lesson_detail.html', context)
+
+
+@login_required
+def student_attendance(request):
+    try:
+        student = request.user.student
+    except:
+        messages.error(request, 'Профиль студента не найден.')
+        return redirect('home')
+
+    attendances = Attendance.objects.filter(student=student).select_related(
+        'lesson__schedule__discipline__plan',
+        'lesson__schedule',
+        'attendance_type'
+    ).order_by('lesson__schedule__date')
+
+    disciplines_dict = {}
+    for att in attendances:
+        discipline_name = att.lesson.schedule.discipline.plan.name
+        discipline_id = att.lesson.schedule.discipline.id
+        if discipline_id not in disciplines_dict:
+            disciplines_dict[discipline_id] = discipline_name
+
+    dates_dict = {}
+    for att in attendances:
+        date = att.lesson.schedule.date
+        if date not in dates_dict:
+            dates_dict[date] = date
+
+    sorted_dates = sorted(dates_dict.keys())
+
+    matrix = {}
+    for discipline_id in disciplines_dict:
+        matrix[discipline_id] = {}
+        for date in sorted_dates:
+            matrix[discipline_id][date] = None
+
+    for att in attendances:
+        discipline_id = att.lesson.schedule.discipline.id
+        date = att.lesson.schedule.date
+        matrix[discipline_id][date] = att.attendance_type.name
+
+    total = attendances.count()
+    present = attendances.filter(attendance_type__name='Присутствовал').count()
+    absent = total - present
+    attendance_percent = round((present / total * 100) if total > 0 else 0)
+
+    context = {
+        'student': student,
+        'disciplines': disciplines_dict.items(),
+        'dates': sorted_dates,
+        'matrix': matrix,
+        'total': total,
+        'present': present,
+        'absent': absent,
+        'attendance_percent': attendance_percent,
+    }
+    return render(request, 'users/student/attendance.html', context)
