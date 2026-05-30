@@ -66,32 +66,26 @@
                 </thead>
                 <tbody>
 
-                    {% for task in tasks %}
+                    {% for item in tasks_with_grades %}
 
-                        <tr>
-                            <td>{{ task.name }}</td>
+                        <tr class="{% if item.grade == 1 %}table-danger{% endif %}">
                             <td>
-                                {% with user_grades|get_by_key:task.id as grade %}
-
-                                    {% if grade %}
-
-                                        <span class="badge
-                                            {% if grade == 5 %}bg-dark-green
-                                            {% elif grade == 4 %}bg-success
-                                            {% elif grade == 3 %}bg-warning text-dark
-                                            {% elif grade == 2 %}bg-danger
-                                            {% else %}bg-dark text-white
-                                            {% endif %}">
-                                            {{ grade }}
-                                        </span>
-
-                                    {% else %}
-
-                                        <span class="text-muted">—</span>
-
-                                    {% endif %}
-
-                                {% endwith %}
+                                <strong>{{ item.task.name }}</strong>
+                                {% if item.task.description %}
+                                    <br>
+                                    <small class="text-muted">{{ item.task.description }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge
+                                    {% if item.grade == 5 %}bg-dark-green
+                                    {% elif item.grade == 4 %}bg-success
+                                    {% elif item.grade == 3 %}bg-warning text-dark
+                                    {% elif item.grade == 2 %}bg-danger
+                                    {% else %}bg-dark text-white
+                                    {% endif %}">
+                                    {{ item.grade }}
+                                </span>
                             </td>
                         </tr>
 
@@ -152,7 +146,7 @@
             </a>
 
         {% endif %}
-        
+
     </div>
 </div>
 

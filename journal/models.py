@@ -157,6 +157,7 @@ class Lesson(models.Model):
 class Task(models.Model):
     name = models.CharField(max_length=200, verbose_name="Название задания")
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='tasks', verbose_name="Занятие")
+    description = models.TextField(blank=True, verbose_name="Описание задания")
 
     def __str__(self):
         return self.name

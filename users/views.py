@@ -215,17 +215,20 @@ def lesson_detail(request, lesson_id):
 
     tasks = Task.objects.filter(lesson=lesson)
 
-    user_grades = {}
+    tasks_with_grades = []
     for task in tasks:
         grade = Grade.objects.filter(student=student, task=task).first()
-        user_grades[task.id] = grade.value if grade else None
+        if grade:
+            tasks_with_grades.append({
+                'task': task,
+                'grade': grade.value,
+            })
 
     files = LessonFile.objects.filter(lesson=lesson)
 
     context = {
         'lesson': lesson,
-        'tasks': tasks,
-        'user_grades': user_grades,
+        'tasks_with_grades': tasks_with_grades,
         'files': files,
     }
     return render(request, 'users/student/lesson_detail.html', context)
