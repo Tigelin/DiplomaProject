@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Student, Grade, Task, Discipline, Lesson
+from journal.models import Student, Grade, Task, Discipline, Lesson, LessonFile
 
 # Create your views here.
 
@@ -220,9 +220,12 @@ def lesson_detail(request, lesson_id):
         grade = Grade.objects.filter(student=student, task=task).first()
         user_grades[task.id] = grade.value if grade else None
 
+    files = LessonFile.objects.filter(lesson=lesson)
+
     context = {
         'lesson': lesson,
         'tasks': tasks,
         'user_grades': user_grades,
+        'files': files,
     }
     return render(request, 'users/student/lesson_detail.html', context)
