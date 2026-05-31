@@ -319,3 +319,22 @@ def teacher_profile(request):
         'teacher': teacher,
     }
     return render(request, 'users/teacher/profile.html', context)
+
+
+@login_required
+def teacher_groups(request):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    groups = Group.objects.filter(
+        discipline__teacher=teacher
+    ).distinct()
+
+    context = {
+        'teacher': teacher,
+        'groups': groups,
+    }
+    return render(request, 'users/teacher/groups.html', context)
