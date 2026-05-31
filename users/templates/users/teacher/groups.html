@@ -37,6 +37,7 @@
                                             <th>Дисциплина</th>
                                             <th>По факту</th>
                                             <th>По плану</th>
+                                            <th>Действия</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -53,6 +54,11 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>{{ discipline.plan.total_hours }} ч.</td>
+                                                <td>
+                                                    <a href="{% url 'teacher_journal' discipline.id %}" class="btn btn-sm btn-outline-primary">
+                                                        Журнал оценок
+                                                    </a>
+                                                </td>
                                             </tr>
 
                                         {% endfor %}

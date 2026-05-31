@@ -1,0 +1,117 @@
+{% extends "journal/base.html" %}
+{% load dict_extras %}
+
+{% block title %}Журнал оценок - {{ discipline.plan.name }}{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Личный кабинет</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_groups' %}">Мои группы</a></li>
+    <li class="breadcrumb-item active">{{ discipline.plan.name }} ({{ discipline.group.name }})</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill"></i> Журнал оценок - {{ discipline.plan.name }}</h4>
+        <small>Группа: {{ discipline.group.name }}</small>
+    </div>
+    <div class="card-body">
+        
+        {% if students and schedules %}
+
+            <div class="table-responsive">
+                <table class="table table-bordered text-center align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="min-width: 150px">Студент</th>
+
+                            {% for schedule in schedules %}
+
+                                <th style="min-width: 80px">
+                                    {{ schedule.date|date:"d.m.Y" }}<br>
+                                    <small>{{ schedule.lesson_number }} пара</small>
+                                </th>
+
+                            {% endfor %}
+
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        {% for student in students %}
+
+                            <tr>
+                                <th class="bg-light text-start">
+                                    {{ student.user.last_name }} {{ student.user.first_name }}
+                                </th>
+
+                                {% for schedule in schedules %}
+
+                                    <td class="align-middle">
+
+                                        {% with grades_matrix|get_by_key:student.id|get_by_key:schedule.id as grade_list %}
+
+                                            {% if grade_list %}
+
+                                                {% for grade in grade_list %}
+
+                                                    <span class="badge
+                                                        {% if grade == 5 %}bg-dark-green
+                                                        {% elif grade == 4 %}bg-success
+                                                        {% elif grade == 3 %}bg-warning text-dark
+                                                        {% elif grade == 2 %}bg-danger
+                                                        {% else %}bg-dark text-white
+                                                        {% endif %} mb-1"
+                                                        style="cursor: pointer;">
+                                                        {{ grade }}
+                                                    </span>
+
+                                                    {% if not forloop.last %}<br>{% endif %}
+
+                                                {% endfor %}
+
+                                            {% else %}
+
+                                                <span class="text-muted">—</span>
+
+                                            {% endif %}
+
+                                        {% endwith %}
+
+                                    </td>
+
+                                {% endfor %}
+
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+
+            <div class="alert alert-info text-center">
+                <i class="bi bi-info-circle"></i>
+                {% if not students %}
+                    В группе нет студентов.
+                {% elif not schedules %}
+                    Нет расписания для этой дисциплины.
+                {% endif %}
+            </div>
+        
+        {% endif %}
+        
+        <a href="{% url 'teacher_groups' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад к группам
+        </a>
+        
+    </div>
+</div>
+
+{% endblock %}

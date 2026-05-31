@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student
+from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student, Schedule
 
 # Create your views here.
 
@@ -350,3 +350,50 @@ def teacher_groups(request):
         'groups': groups,
     }
     return render(request, 'users/teacher/groups.html', context)
+
+
+@login_required
+def teacher_journal(request, discipline_id):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    discipline = get_object_or_404(Discipline, id=discipline_id)
+
+    if discipline.teacher != teacher:
+        messages.error(request, 'У вас нет доступа к этой дисциплине.')
+        return redirect('teacher_groups')
+
+    students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
+
+    schedules = Schedule.objects.filter(
+        discipline=discipline
+    ).select_related('classroom').order_by('date', 'lesson_number')
+
+    grades_matrix = {}
+    for student in students:
+        grades_matrix[student.id] = {}
+        for schedule in schedules:
+            grades_matrix[student.id][schedule.id] = None
+
+    grades = Grade.objects.filter(
+        task__lesson__schedule__discipline=discipline
+    ).select_related('student', 'task__lesson__schedule')
+
+    for grade in grades:
+        student_id = grade.student.id
+        schedule_id = grade.task.lesson.schedule.id
+        if grades_matrix[student_id].get(schedule_id) is None:
+            grades_matrix[student_id][schedule_id] = []
+        grades_matrix[student_id][schedule_id].append(grade.value)
+
+    context = {
+        'teacher': teacher,
+        'discipline': discipline,
+        'students': students,
+        'schedules': schedules,
+        'grades_matrix': grades_matrix,
+    }
+    return render(request, 'users/teacher/journal.html', context)
