@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group
+from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student
 
 # Create your views here.
 
@@ -332,6 +332,18 @@ def teacher_groups(request):
     groups = Group.objects.filter(
         discipline__teacher=teacher
     ).distinct()
+
+    for group in groups:
+        disciplines = Discipline.objects.filter(group=group, teacher=teacher)
+        group.disciplines = disciplines
+        for discipline in disciplines:
+            total_hours = 0
+            lessons = Lesson.objects.filter(
+                schedule__discipline=discipline
+            )
+            for lesson in lessons:
+                total_hours += lesson.hours
+            discipline.actual_hours = total_hours
 
     context = {
         'teacher': teacher,

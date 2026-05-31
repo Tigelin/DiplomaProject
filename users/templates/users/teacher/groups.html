@@ -14,38 +14,63 @@
 
 <div class="card">
     <div class="card-header bg-primary text-white">
-        <h4 class="mb-0"><i class="bi bi-people"></i> Мои группы</h4>
+        <h4 class="mb-0"><i class="bi bi-people"></i> Мои группы и дисциплины</h4>
     </div>
     <div class="card-body">
-        
+
         {% if groups %}
-        
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Название группы</th>
-                            <th>Год поступления</th>
-                            <th>Отделение</th>
-                            <th>Количество студентов</th>
-                        </tr>
-                    </thead>
-                    <tbody>
 
-                        {% for group in groups %}
+            {% for group in groups %}
 
-                            <tr>
-                                <td>{{ group.name }}</td>
-                                <td>{{ group.year }}</td>
-                                <td>{{ group.department.name }}</td>
-                                <td>{{ group.student_set.count }}</td>
-                            </tr>
-                        
-                        {% endfor %}
-                        
-                    </tbody>
-                </table>
-            </div>
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">{{ group.name }} ({{ group.year }} год)</h5>
+                    </div>
+                    <div class="card-body">
+
+                        {% if group.disciplines %}
+
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Дисциплина</th>
+                                            <th>По факту</th>
+                                            <th>По плану</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+
+                                        {% for discipline in group.disciplines %}
+
+                                            <tr>
+                                                <td>{{ discipline.plan.name }}</td>
+                                                <td>
+                                                    {% if discipline.actual_hours > 0 %}
+                                                        {{ discipline.actual_hours }} ч.
+                                                    {% else %}
+                                                        <span class="text-muted">0 ч.</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ discipline.plan.total_hours }} ч.</td>
+                                            </tr>
+
+                                        {% endfor %}
+
+                                    </tbody>
+                                </table>
+                            </div>
+
+                        {% else %}
+
+                            <p class="text-muted text-center">Нет дисциплин</p>
+
+                        {% endif %}
+
+                    </div>
+                </div>
+
+            {% endfor %}
         
         {% else %}
         
