@@ -1,0 +1,166 @@
+{% extends "journal/base.html" %}
+
+{% block title %}
+
+    {% if created %}
+
+        Новое занятие
+
+    {% else %}
+
+        Редактирование занятия
+
+    {% endif %}
+
+    - {{ schedule.discipline.plan.name }}
+
+{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Личный кабинет</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_groups' %}">Мои группы</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_journal' schedule.discipline.id %}">Журнал оценок</a></li>
+    <li class="breadcrumb-item active">
+
+        {% if created %}
+
+            Новое занятие
+
+        {% else %}
+
+            Редактирование
+
+        {% endif %}
+
+    </li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-calendar-plus"></i>
+
+            {% if created %}
+
+                Создание занятия
+
+            {% else %}
+
+                Редактирование занятия
+
+            {% endif %}
+
+        </h4>
+    </div>
+    <div class="card-body">
+
+        <div class="alert alert-info">
+            <strong>Дисциплина:</strong> {{ schedule.discipline.plan.name }}<br>
+            <strong>Группа:</strong> {{ schedule.discipline.group.name }}<br>
+            <strong>Дата:</strong> {{ schedule.date|date:"d.m.Y" }}<br>
+            <strong>Пара:</strong> {{ schedule.lesson_number }}<br>
+            <strong>Кабинет:</strong> {{ schedule.classroom.number }}
+        </div>
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label class="form-label">Тема занятия</label>
+                <input type="text" name="topic" class="form-control" value="{{ lesson.topic }}">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Тип занятия</label>
+                <select name="lesson_type" class="form-select">
+                    <option value="">-- Выберите тип --</option>
+
+                    {% for lt in lesson_types %}
+
+                        <option value="{{ lt.id }}" {% if lesson.lesson_type.id == lt.id %}selected{% endif %}>
+                            {{ lt.name }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Количество часов</label>
+                <input type="number" name="hours" class="form-control" value="{{ lesson.hours }}" min="1" max="8">
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Сохранить занятие
+            </button>
+        </form>
+
+        <hr>
+
+        <h5 class="mt-4">Файлы к занятию</h5>
+
+        <form method="post" enctype="multipart/form-data" class="mt-3">
+            {% csrf_token %}
+
+            <div class="row">
+                <div class="col-md-5">
+                    <input type="text" name="file_name" class="form-control" placeholder="Название файла">
+                </div>
+                <div class="col-md-5">
+                    <input type="file" name="file" class="form-control" required>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-upload"></i> Загрузить
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        {% if files %}
+
+            <div class="table-responsive mt-3">
+                <table class="table table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Название</th>
+                            <th>Файл</th>
+                            <th>Дата загрузки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+
+                        {% for file in files %}
+
+                            <tr>
+                                <td>{{ file.name }}</td>
+                                <td><a href="{{ file.file.url }}" target="_blank">{{ file.file.name|slice:"14:" }}</a></td>
+                                <td>{{ file.uploaded_at|date:"d.m.Y H:i" }}</td>
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+
+            <p class="text-muted text-center mt-3">Нет загруженных файлов</p>
+
+        {% endif %}
+
+        <a href="{% url 'teacher_journal' schedule.discipline.id %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад к журналу
+        </a>
+        
+    </div>
+</div>
+
+{% endblock %}

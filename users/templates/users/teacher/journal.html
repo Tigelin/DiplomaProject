@@ -20,7 +20,7 @@
         <small>Группа: {{ discipline.group.name }}</small>
     </div>
     <div class="card-body">
-        
+
         {% if students and schedules %}
 
             <div class="table-responsive">
@@ -31,12 +31,16 @@
 
                             {% for schedule in schedules %}
 
-                                <th style="min-width: 80px; vertical-align: top;" class="{% if not schedule.has_lesson %}opacity-50{% endif %}">
+                                <th style="min-width: 80px; vertical-align: top; cursor: pointer;" onclick="window.location.href='{% url 'teacher_lesson' schedule.id %}'" class="{% if not schedule.has_lesson %}opacity-50{% endif %}">
                                     {{ schedule.date|date:"d.m.Y" }}<br>
                                     <small>{{ schedule.lesson_number }} пара</small>
+
                                     {% if schedule.lesson_type %}
+
                                         <br><span class="badge bg-secondary mt-1">{{ schedule.lesson_type }}</span>
+
                                     {% endif %}
+
                                 </th>
 
                             {% endfor %}
@@ -101,19 +105,21 @@
 
             <div class="alert alert-info text-center">
                 <i class="bi bi-info-circle"></i>
+
                 {% if not students %}
                     В группе нет студентов.
                 {% elif not schedules %}
                     Нет расписания для этой дисциплины.
                 {% endif %}
+
             </div>
-        
+
         {% endif %}
-        
+
         <a href="{% url 'teacher_groups' %}" class="btn btn-secondary mt-3">
             <i class="bi bi-arrow-left"></i> Назад к группам
         </a>
-        
+
     </div>
 </div>
 

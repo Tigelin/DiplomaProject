@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student, Schedule
+from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student, Schedule, LessonType
 
 # Create your views here.
 
@@ -405,3 +405,52 @@ def teacher_journal(request, discipline_id):
         'grades_matrix': grades_matrix,
     }
     return render(request, 'users/teacher/journal.html', context)
+
+
+@login_required
+def teacher_lesson(request, schedule_id):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    schedule = get_object_or_404(Schedule, id=schedule_id)
+
+    if schedule.discipline.teacher != teacher:
+        messages.error(request, 'У вас нет доступа к этому занятию.')
+        return redirect('teacher_groups')
+
+    lesson, created = Lesson.objects.get_or_create(schedule=schedule)
+
+    if request.method == 'POST':
+        lesson.topic = request.POST.get('topic', '')
+        lesson_type_id = request.POST.get('lesson_type')
+        if lesson_type_id:
+            lesson.lesson_type_id = lesson_type_id
+        lesson.hours = int(request.POST.get('hours', 2))
+        lesson.save()
+
+        if request.FILES.get('file'):
+            LessonFile.objects.create(
+                name=request.POST.get('file_name', request.FILES['file'].name),
+                lesson=lesson,
+                file=request.FILES['file']
+            )
+            messages.success(request, 'Файл загружен.')
+
+        messages.success(request, 'Занятие сохранено.')
+        return redirect('teacher_lesson', schedule_id=schedule.id)
+
+    lesson_types = LessonType.objects.all()
+    files = LessonFile.objects.filter(lesson=lesson)
+
+    context = {
+        'teacher': teacher,
+        'schedule': schedule,
+        'lesson': lesson,
+        'created': created,
+        'lesson_types': lesson_types,
+        'files': files,
+    }
+    return render(request, 'users/teacher/lesson.html', context)
