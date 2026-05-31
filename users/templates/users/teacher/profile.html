@@ -1,0 +1,65 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Мой профиль{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Личный кабинет</a></li>
+    <li class="breadcrumb-item active">Мой профиль</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-person-badge"></i> Мой профиль</h4>
+    </div>
+    <div class="card-body">
+        
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted">Фамилия</label>
+                <p class="form-control-plaintext fw-bold">{{ teacher.user.last_name }}</p>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted">Имя</label>
+                <p class="form-control-plaintext fw-bold">{{ teacher.user.first_name }}</p>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-muted">Отчество</label>
+                <p class="form-control-plaintext fw-bold">{{ teacher.user.patronymic|default:"—" }}</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label text-muted">Email</label>
+                <p class="form-control-plaintext fw-bold">{{ teacher.user.email }}</p>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label text-muted">Телефон</label>
+                <p class="form-control-plaintext fw-bold">{{ teacher.user.phone|default:"—" }}</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label text-muted">Логин</label>
+                <p class="form-control-plaintext fw-bold">{{ teacher.user.username }}</p>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label text-muted">Дата регистрации</label>
+                <p class="form-control-plaintext fw-bold">{{ teacher.user.date_joined|date:"d.m.Y" }}</p>
+            </div>
+        </div>
+        
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад в кабинет
+        </a>
+        
+    </div>
+</div>
+
+{% endblock %}

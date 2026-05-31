@@ -20,6 +20,20 @@
         <div class="alert alert-success">
             Добро пожаловать, {{ teacher.user.get_full_name|default:teacher.user.username }}!
         </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-person-badge fs-1 text-primary"></i>
+                        <h5 class="mt-2">Мой профиль</h5>
+                        <p class="text-muted">Просмотр информации</p>
+                        <a href="{% url 'teacher_profile' %}" class="btn btn-outline-primary">Перейти</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 

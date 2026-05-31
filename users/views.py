@@ -305,3 +305,17 @@ def teacher_dashboard(request):
         'teacher': teacher,
     }
     return render(request, 'users/teacher/dashboard.html', context)
+
+
+@login_required
+def teacher_profile(request):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    context = {
+        'teacher': teacher,
+    }
+    return render(request, 'users/teacher/profile.html', context)
