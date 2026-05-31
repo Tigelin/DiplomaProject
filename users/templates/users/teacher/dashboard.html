@@ -1,0 +1,26 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Личный кабинет преподавателя{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item active">Личный кабинет</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-person-badge"></i> Личный кабинет преподавателя</h4>
+    </div>
+    <div class="card-body">
+        
+        <div class="alert alert-success">
+            Добро пожаловать, {{ teacher.user.get_full_name|default:teacher.user.username }}!
+        </div>
+    </div>
+</div>
+
+{% endblock %}

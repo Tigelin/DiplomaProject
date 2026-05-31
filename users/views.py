@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Student, Grade, Task, Discipline, Lesson, LessonFile, Attendance
+from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group
 
 # Create your views here.
 
@@ -36,7 +36,8 @@ def logout_view(request):
 def dashboard(request):
     if request.user.role and request.user.role.name == 'Студент':
         return redirect('student_dashboard')
-
+    elif request.user.role and request.user.role.name == 'Преподаватель':
+        return redirect('teacher_dashboard')
     return render(request, 'users/dashboard.html')
 
 
@@ -290,3 +291,17 @@ def student_attendance(request):
         'attendance_percent': attendance_percent,
     }
     return render(request, 'users/student/attendance.html', context)
+
+
+@login_required
+def teacher_dashboard(request):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    context = {
+        'teacher': teacher,
+    }
+    return render(request, 'users/teacher/dashboard.html', context)
