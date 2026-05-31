@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student, Schedule, LessonType
+from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student, Schedule, LessonType, AttendanceType
 
 # Create your views here.
 
@@ -421,14 +421,23 @@ def teacher_lesson(request, schedule_id):
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
 
-    lesson, created = Lesson.objects.get_or_create(schedule=schedule)
+    lesson = Lesson.objects.filter(schedule=schedule).first()
 
     if request.method == 'POST':
+        if not lesson:
+            lesson = Lesson.objects.create(schedule=schedule, hours=2)
+            students = Student.objects.filter(group=schedule.discipline.group)
+            attendance_type, _ = AttendanceType.objects.get_or_create(name='Присутствовал')
+            for student in students:
+                Attendance.objects.create(lesson=lesson, student=student, attendance_type=attendance_type)
+        else:
+            lesson.hours = 2
+            lesson.save()
+
         lesson.topic = request.POST.get('topic', '')
         lesson_type_id = request.POST.get('lesson_type')
         if lesson_type_id:
             lesson.lesson_type_id = lesson_type_id
-        lesson.hours = int(request.POST.get('hours', 2))
         lesson.save()
 
         if request.FILES.get('file'):
@@ -442,8 +451,10 @@ def teacher_lesson(request, schedule_id):
         messages.success(request, 'Занятие сохранено.')
         return redirect('teacher_lesson', schedule_id=schedule.id)
 
+    created = lesson is None
+
     lesson_types = LessonType.objects.all()
-    files = LessonFile.objects.filter(lesson=lesson)
+    files = LessonFile.objects.filter(lesson=lesson) if lesson else []
 
     context = {
         'teacher': teacher,
