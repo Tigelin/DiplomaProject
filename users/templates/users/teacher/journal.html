@@ -27,13 +27,16 @@
                 <table class="table table-bordered text-center align-middle">
                     <thead class="table-dark">
                         <tr>
-                            <th style="min-width: 150px">Студент</th>
+                            <th style="min-width: 150px; vertical-align: middle;">Студент</th>
 
                             {% for schedule in schedules %}
 
-                                <th style="min-width: 80px">
+                                <th style="min-width: 80px; vertical-align: top;" class="{% if not schedule.has_lesson %}opacity-50{% endif %}">
                                     {{ schedule.date|date:"d.m.Y" }}<br>
                                     <small>{{ schedule.lesson_number }} пара</small>
+                                    {% if schedule.lesson_type %}
+                                        <br><span class="badge bg-secondary mt-1">{{ schedule.lesson_type }}</span>
+                                    {% endif %}
                                 </th>
 
                             {% endfor %}
@@ -45,13 +48,13 @@
                         {% for student in students %}
 
                             <tr>
-                                <th class="bg-light text-start">
+                                <th class="bg-light text-start" style="vertical-align: middle;">
                                     {{ student.user.last_name }} {{ student.user.first_name }}
                                 </th>
 
                                 {% for schedule in schedules %}
 
-                                    <td class="align-middle">
+                                    <td class="align-middle {% if not schedule.has_lesson %}opacity-50{% endif %}">
 
                                         {% with grades_matrix|get_by_key:student.id|get_by_key:schedule.id as grade_list %}
 

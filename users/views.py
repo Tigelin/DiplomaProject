@@ -372,6 +372,14 @@ def teacher_journal(request, discipline_id):
         discipline=discipline
     ).select_related('classroom').order_by('date', 'lesson_number')
 
+    for schedule in schedules:
+        schedule.has_lesson = Lesson.objects.filter(schedule=schedule).exists()
+        if schedule.has_lesson:
+            lesson = Lesson.objects.get(schedule=schedule)
+            schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
+        else:
+            schedule.lesson_type = None
+
     grades_matrix = {}
     for student in students:
         grades_matrix[student.id] = {}
