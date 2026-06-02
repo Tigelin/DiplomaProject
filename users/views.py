@@ -377,25 +377,27 @@ def teacher_journal(request, discipline_id):
         if schedule.has_lesson:
             lesson = Lesson.objects.get(schedule=schedule)
             schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
+            schedule.tasks = Task.objects.filter(lesson=lesson)
         else:
             schedule.lesson_type = None
+            schedule.tasks = []
 
     grades_matrix = {}
     for student in students:
         grades_matrix[student.id] = {}
         for schedule in schedules:
-            grades_matrix[student.id][schedule.id] = None
+            for task in schedule.tasks:
+                grades_matrix[student.id][task.id] = None
 
     grades = Grade.objects.filter(
         task__lesson__schedule__discipline=discipline
-    ).select_related('student', 'task__lesson__schedule')
+    ).select_related('student', 'task')
 
     for grade in grades:
         student_id = grade.student.id
-        schedule_id = grade.task.lesson.schedule.id
-        if grades_matrix[student_id].get(schedule_id) is None:
-            grades_matrix[student_id][schedule_id] = []
-        grades_matrix[student_id][schedule_id].append(grade.value)
+        task_id = grade.task.id
+        if student_id in grades_matrix and task_id in grades_matrix[student_id]:
+            grades_matrix[student_id][task_id] = grade.value
 
     context = {
         'teacher': teacher,

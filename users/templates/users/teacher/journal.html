@@ -31,7 +31,7 @@
 
                             {% for schedule in schedules %}
 
-                                <th style="min-width: 80px; vertical-align: top; cursor: pointer;" onclick="window.location.href='{% url 'teacher_lesson' schedule.id %}'" class="{% if not schedule.has_lesson %}opacity-50{% endif %}">
+                                <th colspan="{{ schedule.tasks|length|default:1 }}" style="vertical-align: top; cursor: pointer;" onclick="window.location.href='{% url 'teacher_lesson' schedule.id %}'" class="{% if not schedule.has_lesson %}opacity-50{% endif %}">
                                     {{ schedule.date|date:"d.m.Y" }}<br>
                                     <small>{{ schedule.lesson_number }} пара</small>
 
@@ -42,6 +42,34 @@
                                     {% endif %}
 
                                 </th>
+
+                            {% endfor %}
+
+                        </tr>
+                        <tr>
+                            <th style="vertical-align: middle;"></th>
+
+                            {% for schedule in schedules %}
+
+                                {% if schedule.tasks %}
+
+                                    {% for task in schedule.tasks %}
+
+                                        <th style="min-width: 80px; vertical-align: top; font-weight: normal;">
+                                            <a href="{% url 'teacher_task_grades' task.id %}" class="text-white text-decoration-none">
+                                                {{ task.name }}
+                                            </a>
+                                        </th>
+
+                                    {% endfor %}
+
+                                {% else %}
+
+                                    <th style="min-width: 80px; vertical-align: top; font-weight: normal;">
+                                        <span class="text-white-50">нет заданий</span>
+                                    </th>
+
+                                {% endif %}
 
                             {% endfor %}
 
@@ -58,38 +86,45 @@
 
                                 {% for schedule in schedules %}
 
-                                    <td class="align-middle {% if not schedule.has_lesson %}opacity-50{% endif %}">
+                                    {% if schedule.tasks %}
 
-                                        {% with grades_matrix|get_by_key:student.id|get_by_key:schedule.id as grade_list %}
+                                        {% for task in schedule.tasks %}
 
-                                            {% if grade_list %}
+                                            <td class="align-middle">
 
-                                                {% for grade in grade_list %}
+                                                {% with grades_matrix|get_by_key:student.id|get_by_key:task.id as grade %}
 
-                                                    <span class="badge
-                                                        {% if grade == 5 %}bg-dark-green
-                                                        {% elif grade == 4 %}bg-success
-                                                        {% elif grade == 3 %}bg-warning text-dark
-                                                        {% elif grade == 2 %}bg-danger
-                                                        {% else %}bg-dark text-white
-                                                        {% endif %} mb-1"
-                                                        style="cursor: pointer;">
-                                                        {{ grade }}
-                                                    </span>
+                                                    {% if grade %}
 
-                                                    {% if not forloop.last %}<br>{% endif %}
+                                                        <span class="badge
+                                                            {% if grade == 5 %}bg-dark-green
+                                                            {% elif grade == 4 %}bg-success
+                                                            {% elif grade == 3 %}bg-warning text-dark
+                                                            {% elif grade == 2 %}bg-danger
+                                                            {% else %}bg-dark text-white
+                                                            {% endif %}">
+                                                            {{ grade }}
+                                                        </span>
 
-                                                {% endfor %}
+                                                    {% else %}
 
-                                            {% else %}
+                                                        <span class="text-muted">—</span>
 
-                                                <span class="text-muted">—</span>
+                                                    {% endif %}
 
-                                            {% endif %}
+                                                {% endwith %}
 
-                                        {% endwith %}
+                                            </td>
 
-                                    </td>
+                                        {% endfor %}
+
+                                    {% else %}
+
+                                        <td class="align-middle {% if not schedule.has_lesson %}opacity-50{% endif %}">
+                                            <span class="text-muted">—</span>
+                                        </td>
+
+                                    {% endif %}
 
                                 {% endfor %}
 
