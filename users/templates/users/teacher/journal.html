@@ -35,7 +35,10 @@
             </div>
             <div class="col-md-8 text-end">
                 <a href="{% url 'export_journal_excel' discipline.id %}" class="btn btn-success">
-                    <i class="bi bi-file-earmark-excel"></i> Выгрузить в Excel
+                    <i class="bi bi-file-earmark-excel"></i> Excel
+                </a>
+                <a href="{% url 'export_journal_docx' discipline.id %}" class="btn btn-primary ms-2">
+                    <i class="bi bi-file-earmark-word"></i> Word
                 </a>
             </div>
         </div>

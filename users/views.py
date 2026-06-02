@@ -9,6 +9,12 @@ from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from django.http import HttpResponse
 from urllib.parse import quote
 from datetime import datetime
+from docx import Document
+from docx.shared import Inches, Pt, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 
 # Create your views here.
 
@@ -784,4 +790,140 @@ def export_journal_excel(request, discipline_id):
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
     wb.save(response)
+    return response
+
+
+@login_required
+def export_journal_docx(request, discipline_id):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    discipline = get_object_or_404(Discipline, id=discipline_id)
+
+    if discipline.teacher != teacher:
+        messages.error(request, 'У вас нет доступа к этой дисциплине.')
+        return redirect('teacher_groups')
+
+    students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
+
+    schedules = Schedule.objects.filter(
+        discipline=discipline
+    ).select_related('classroom').order_by('date', 'lesson_number')
+
+    for schedule in schedules:
+        lesson = Lesson.objects.filter(schedule=schedule).first()
+        schedule.has_lesson = lesson is not None
+        if schedule.has_lesson:
+            schedule.lesson = lesson
+            schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
+            schedule.tasks = Task.objects.filter(lesson=lesson)
+            schedule.topic = lesson.topic if lesson.topic else '—'
+        else:
+            schedule.lesson_type = None
+            schedule.tasks = []
+            schedule.lesson = None
+            schedule.topic = None
+
+    doc = Document()
+
+    style = doc.styles['Normal']
+    style.font.name = 'Times New Roman'
+    style.font.size = Pt(12)
+
+    section = doc.sections[0]
+    section.top_margin = Cm(2)
+    section.bottom_margin = Cm(2)
+    section.left_margin = Cm(2.5)
+    section.right_margin = Cm(1.5)
+
+    title = doc.add_heading('Журнал оценок', 0)
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    doc.add_paragraph(f'Дисциплина: {discipline.plan.name}')
+    doc.add_paragraph(f'Группа: {discipline.group.name}')
+    doc.add_paragraph(f'Преподаватель: {teacher.user.last_name} {teacher.user.first_name} {teacher.user.patronymic}')
+    doc.add_paragraph()
+
+    table_rows = 2 + len(students)
+    table_cols = 2
+    for schedule in schedules:
+        if schedule.has_lesson and schedule.tasks:
+            table_cols += len(schedule.tasks)
+        elif schedule.has_lesson:
+            table_cols += 1
+
+    table = doc.add_table(rows=table_rows, cols=table_cols)
+    table.style = 'Table Grid'
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+    for row in table.rows:
+        for cell in row.cells:
+            cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    col = 0
+    table.cell(0, col).text = '№'
+    table.cell(1, col).text = '№'
+    col += 1
+    table.cell(0, col).text = 'Студент'
+    table.cell(1, col).text = 'Студент'
+    col += 1
+
+    for schedule in schedules:
+        if schedule.has_lesson and schedule.tasks:
+            first_col = col
+            for task in schedule.tasks:
+                col += 1
+            last_col = col - 1
+            cell_value = f"{schedule.date.strftime('%d.%m.%Y')} ({schedule.lesson_number} пара)\n{schedule.topic}"
+            table.cell(0, first_col).text = cell_value
+            if first_col != last_col:
+                table.cell(0, first_col).merge(table.cell(0, last_col))
+        elif schedule.has_lesson:
+            cell_value = f"{schedule.date.strftime('%d.%m.%Y')} ({schedule.lesson_number} пара)\n{schedule.topic}"
+            table.cell(0, col).text = cell_value
+            col += 1
+
+    col = 2
+    for schedule in schedules:
+        if schedule.has_lesson and schedule.tasks:
+            for task in schedule.tasks:
+                table.cell(1, col).text = task.name
+                col += 1
+        elif schedule.has_lesson:
+            col += 1
+
+    for idx, student in enumerate(students, start=1):
+        row = idx + 1
+        col = 0
+        table.cell(row, col).text = str(idx)
+        col += 1
+        table.cell(row, col).text = f"{student.user.last_name} {student.user.first_name} {student.user.patronymic}"
+        col += 1
+
+        for schedule in schedules:
+            if schedule.has_lesson and schedule.tasks:
+                for task in schedule.tasks:
+                    grade = Grade.objects.filter(task=task, student=student).first()
+                    grade_value = grade.value if grade else ''
+                    table.cell(row, col).text = str(grade_value) if grade_value else ''
+                    col += 1
+            elif schedule.has_lesson:
+                col += 1
+
+    for row in table.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                for run in paragraph.runs:
+                    run.font.size = Pt(10)
+
+    current_date = datetime.now().strftime('%d.%m.%Y')
+    filename = f"{discipline.plan.name}_{discipline.group.name}_{current_date}.docx"
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    doc.save(response)
     return response
