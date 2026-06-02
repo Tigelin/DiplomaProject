@@ -126,6 +126,7 @@
                         <tr>
                             <th>Название</th>
                             <th>Описание</th>
+                            <th>Действия</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -135,6 +136,11 @@
                             <tr>
                                 <td>{{ task.name }}</td>
                                 <td>{{ task.description|default:"—" }}</td>
+                                <td>
+                                    <a href="{% url 'teacher_task_grades' task.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i> Оценки
+                                    </a>
+                                </td>
                             </tr>
 
                         {% endfor %}
@@ -207,7 +213,7 @@
         <a href="{% url 'teacher_journal' schedule.discipline.id %}" class="btn btn-secondary mt-3">
             <i class="bi bi-arrow-left"></i> Назад к журналу
         </a>
-        
+
     </div>
 </div>
 

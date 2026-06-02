@@ -479,3 +479,46 @@ def teacher_lesson(request, schedule_id):
         'tasks': tasks,
     }
     return render(request, 'users/teacher/lesson.html', context)
+
+
+@login_required
+def teacher_task_grades(request, task_id):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    task = get_object_or_404(Task, id=task_id)
+
+    if task.lesson.schedule.discipline.teacher != teacher:
+        messages.error(request, 'У вас нет доступа к этому заданию.')
+        return redirect('teacher_groups')
+
+    students = Student.objects.filter(group=task.lesson.schedule.discipline.group).select_related('user').order_by(
+        'user__last_name')
+
+    if request.method == 'POST':
+        for student in students:
+            grade_value = request.POST.get(f'grade_{student.id}')
+            if grade_value and grade_value.isdigit():
+                grade, created = Grade.objects.update_or_create(
+                    task=task,
+                    student=student,
+                    defaults={'value': int(grade_value)}
+                )
+        messages.success(request, 'Оценки сохранены.')
+        return redirect('teacher_task_grades', task_id=task.id)
+
+    grades = {}
+    for student in students:
+        grade = Grade.objects.filter(task=task, student=student).first()
+        grades[student.id] = grade.value if grade else None
+
+    context = {
+        'teacher': teacher,
+        'task': task,
+        'students': students,
+        'grades': grades,
+    }
+    return render(request, 'users/teacher/task_grades.html', context)
