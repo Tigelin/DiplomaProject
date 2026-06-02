@@ -21,6 +21,20 @@
     </div>
     <div class="card-body">
 
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <form method="get" class="form-inline">
+                    <label class="mr-2">Занятий на странице:</label>
+                    <select name="per_page" class="form-select form-select-sm" style="width: auto; display: inline-block;" onchange="this.form.submit()">
+                        <option value="5" {% if per_page == 5 %}selected{% endif %}>5</option>
+                        <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                        <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                    </select>
+                </form>
+            </div>
+        </div>
+
         {% if students and schedules %}
 
             <div class="table-responsive">
@@ -30,19 +44,13 @@
                             <th style="min-width: 150px; vertical-align: middle;">Студент</th>
 
                             {% for schedule in schedules %}
-
                                 <th colspan="{{ schedule.tasks|length|default:1 }}" style="vertical-align: top; cursor: pointer;" onclick="window.location.href='{% url 'teacher_lesson' schedule.id %}'" class="{% if not schedule.has_lesson %}opacity-50{% endif %}">
                                     {{ schedule.date|date:"d.m.Y" }}<br>
                                     <small>{{ schedule.lesson_number }} пара</small>
-
                                     {% if schedule.lesson_type %}
-
                                         <br><span class="badge bg-secondary mt-1">{{ schedule.lesson_type }}</span>
-
                                     {% endif %}
-
                                 </th>
-
                             {% endfor %}
 
                         </tr>
@@ -50,31 +58,21 @@
                             <th style="vertical-align: middle;"></th>
 
                             {% for schedule in schedules %}
-
                                 {% if schedule.has_lesson and schedule.tasks %}
-
                                     {% for task in schedule.tasks %}
-
                                         <th style="min-width: 80px; vertical-align: top; font-weight: normal; cursor: pointer;" onclick="window.location.href='{% url 'teacher_task_grades' task.id %}'">
                                             <span class="text-white">{{ task.name }}</span>
                                         </th>
-
                                     {% endfor %}
-
                                 {% elif schedule.has_lesson %}
-
                                     <th style="min-width: 80px; vertical-align: top; font-weight: normal; cursor: pointer;" onclick="window.location.href='{% url 'teacher_task_create' schedule.lesson.id %}'">
                                         <span class="text-white-50">+ добавить задание</span>
                                     </th>
-
                                 {% else %}
-
                                     <th style="min-width: 80px; vertical-align: top; font-weight: normal; opacity: 0.3;">
                                         <span class="text-white-50">нет занятия</span>
                                     </th>
-
                                 {% endif %}
-
                             {% endfor %}
 
                         </tr>
@@ -82,24 +80,17 @@
                     <tbody>
 
                         {% for student in students %}
-
                             <tr>
                                 <th class="bg-light text-start" style="vertical-align: middle;">
                                     {{ student.user.last_name }} {{ student.user.first_name }}
                                 </th>
 
                                 {% for schedule in schedules %}
-
                                     {% if schedule.has_lesson and schedule.tasks %}
-
                                         {% for task in schedule.tasks %}
-
                                             <td class="align-middle">
-
-                                                {% with grades_matrix|get_by_key:student.id|get_by_key:task.id as grade %}
-
+                                                {% with grade=grades_matrix|get_by_key:student.id|get_by_key:task.id %}
                                                     {% if grade %}
-
                                                         <span class="badge
                                                             {% if grade == 5 %}bg-dark-green
                                                             {% elif grade == 4 %}bg-success
@@ -109,48 +100,69 @@
                                                             {% endif %}">
                                                             {{ grade }}
                                                         </span>
-
                                                     {% else %}
-
                                                         <span class="text-muted">—</span>
-
                                                     {% endif %}
-
                                                 {% endwith %}
-
                                             </td>
-
                                         {% endfor %}
-
-                                    {% else %}
-
-                                        <td class="align-middle {% if not schedule.has_lesson %}opacity-50{% endif %}">
+                                    {% elif schedule.has_lesson %}
+                                        <td class="align-middle">
                                             <span class="text-muted">—</span>
                                         </td>
-
+                                    {% else %}
+                                        <td class="align-middle opacity-50">
+                                            <span class="text-muted">—</span>
+                                        </td>
                                     {% endif %}
-
                                 {% endfor %}
 
                             </tr>
-
                         {% endfor %}
 
                     </tbody>
                 </table>
             </div>
 
+            {% if schedules.has_other_pages %}
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if schedules.has_previous %}
+                            <li class="page-item"><a class="page-link" href="?page=1&per_page={{ per_page }}">««</a></li>
+                            <li class="page-item"><a class="page-link" href="?page={{ schedules.previous_page_number }}&per_page={{ per_page }}">«</a></li>
+                        {% else %}
+                            <li class="page-item disabled"><a class="page-link" href="#">««</a></li>
+                            <li class="page-item disabled"><a class="page-link" href="#">«</a></li>
+                        {% endif %}
+
+                        {% for num in schedules.paginator.page_range %}
+                            {% if schedules.number == num %}
+                                <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
+                            {% elif num > schedules.number|add:'-3' and num < schedules.number|add:'3' %}
+                                <li class="page-item"><a class="page-link" href="?page={{ num }}&per_page={{ per_page }}">{{ num }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if schedules.has_next %}
+                            <li class="page-item"><a class="page-link" href="?page={{ schedules.next_page_number }}&per_page={{ per_page }}">»</a></li>
+                            <li class="page-item"><a class="page-link" href="?page={{ schedules.paginator.num_pages }}&per_page={{ per_page }}">»»</a></li>
+                        {% else %}
+                            <li class="page-item disabled"><a class="page-link" href="#">»</a></li>
+                            <li class="page-item disabled"><a class="page-link" href="#">»»</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+
         {% else %}
 
             <div class="alert alert-info text-center">
                 <i class="bi bi-info-circle"></i>
-
                 {% if not students %}
                     В группе нет студентов.
                 {% elif not schedules %}
                     Нет расписания для этой дисциплины.
                 {% endif %}
-
             </div>
 
         {% endif %}

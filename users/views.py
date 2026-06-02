@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student, Schedule, LessonType, AttendanceType
 
 # Create your views here.
@@ -372,7 +373,19 @@ def teacher_journal(request, discipline_id):
         discipline=discipline
     ).select_related('classroom').order_by('date', 'lesson_number')
 
-    for schedule in schedules:
+    per_page = request.GET.get('per_page', 5)
+    try:
+        per_page = int(per_page)
+    except:
+        per_page = 5
+    if per_page not in [5, 10, 20, 50]:
+        per_page = 5
+
+    paginator = Paginator(schedules, per_page)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    for schedule in page_obj:
         lesson = Lesson.objects.filter(schedule=schedule).first()
         schedule.has_lesson = lesson is not None
         if schedule.has_lesson:
@@ -387,7 +400,7 @@ def teacher_journal(request, discipline_id):
     grades_matrix = {}
     for student in students:
         grades_matrix[student.id] = {}
-        for schedule in schedules:
+        for schedule in page_obj:
             if schedule.has_lesson:
                 for task in schedule.tasks:
                     grades_matrix[student.id][task.id] = None
@@ -406,8 +419,9 @@ def teacher_journal(request, discipline_id):
         'teacher': teacher,
         'discipline': discipline,
         'students': students,
-        'schedules': schedules,
+        'schedules': page_obj,
         'grades_matrix': grades_matrix,
+        'per_page': per_page,
     }
     return render(request, 'users/teacher/journal.html', context)
 
