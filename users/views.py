@@ -461,36 +461,39 @@ def teacher_lesson(request, schedule_id):
                 attendance_type, _ = AttendanceType.objects.get_or_create(name='Присутствовал')
                 for student in students:
                     Attendance.objects.create(lesson=lesson, student=student, attendance_type=attendance_type)
-            else:
-                lesson.hours = 2
-                lesson.save()
 
             lesson.topic = request.POST.get('topic', '')
             lesson_type_id = request.POST.get('lesson_type')
             if lesson_type_id:
                 lesson.lesson_type_id = lesson_type_id
+            lesson.hours = 2
             lesson.save()
 
             messages.success(request, 'Занятие сохранено.')
             return redirect('teacher_lesson', schedule_id=schedule.id)
 
         elif 'add_task' in request.POST:
-            Task.objects.create(
-                name=request.POST.get('task_name'),
-                lesson=lesson,
-                description=request.POST.get('task_description', '')
-            )
-            messages.success(request, 'Задание добавлено.')
+            if lesson:
+                Task.objects.create(
+                    name=request.POST.get('task_name'),
+                    lesson=lesson,
+                    description=request.POST.get('task_description', '')
+                )
+                messages.success(request, 'Задание добавлено.')
+            else:
+                messages.error(request, 'Сначала сохраните занятие.')
             return redirect('teacher_lesson', schedule_id=schedule.id)
 
         elif 'upload_file' in request.POST:
-            if request.FILES.get('file'):
+            if lesson and request.FILES.get('file'):
                 LessonFile.objects.create(
                     name=request.POST.get('file_name', request.FILES['file'].name),
                     lesson=lesson,
                     file=request.FILES['file']
                 )
                 messages.success(request, 'Файл загружен.')
+            else:
+                messages.error(request, 'Сначала сохраните занятие.')
             return redirect('teacher_lesson', schedule_id=schedule.id)
 
     created = lesson is None

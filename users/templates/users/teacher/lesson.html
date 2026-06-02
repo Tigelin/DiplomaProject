@@ -3,15 +3,10 @@
 {% block title %}
 
     {% if created %}
-
         Новое занятие
-
     {% else %}
-
         Редактирование занятия
-
     {% endif %}
-
     - {{ schedule.discipline.plan.name }}
 
 {% endblock %}
@@ -25,13 +20,9 @@
     <li class="breadcrumb-item active">
 
         {% if created %}
-
             Новое занятие
-
         {% else %}
-
             Редактирование
-
         {% endif %}
 
     </li>
@@ -46,13 +37,9 @@
             <i class="bi bi-calendar-plus"></i>
 
             {% if created %}
-
                 Создание занятия
-
             {% else %}
-
                 Редактирование занятия
-
             {% endif %}
 
         </h4>
@@ -81,11 +68,9 @@
                     <option value="">-- Выберите тип --</option>
 
                     {% for lt in lesson_types %}
-
                         <option value="{{ lt.id }}" {% if lesson.lesson_type.id == lt.id %}selected{% endif %}>
                             {{ lt.name }}
                         </option>
-
                     {% endfor %}
 
                 </select>
@@ -132,7 +117,6 @@
                     <tbody>
 
                         {% for task in tasks %}
-
                             <tr>
                                 <td>{{ task.name }}</td>
                                 <td>{{ task.description|default:"—" }}</td>
@@ -142,7 +126,6 @@
                                     </a>
                                 </td>
                             </tr>
-
                         {% endfor %}
 
                     </tbody>
@@ -191,13 +174,11 @@
                     <tbody>
 
                         {% for file in files %}
-
                             <tr>
                                 <td>{{ file.name }}</td>
                                 <td><a href="{{ file.file.url }}" target="_blank">{{ file.file.name|cut:"lesson_files/" }}</a></td>
                                 <td>{{ file.uploaded_at|date:"d.m.Y H:i" }}</td>
                             </tr>
-
                         {% endfor %}
 
                     </tbody>
