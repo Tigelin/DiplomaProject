@@ -424,37 +424,50 @@ def teacher_lesson(request, schedule_id):
     lesson = Lesson.objects.filter(schedule=schedule).first()
 
     if request.method == 'POST':
-        if not lesson:
-            lesson = Lesson.objects.create(schedule=schedule, hours=2)
-            students = Student.objects.filter(group=schedule.discipline.group)
-            attendance_type, _ = AttendanceType.objects.get_or_create(name='Присутствовал')
-            for student in students:
-                Attendance.objects.create(lesson=lesson, student=student, attendance_type=attendance_type)
-        else:
-            lesson.hours = 2
+        if 'save_lesson' in request.POST:
+            if not lesson:
+                lesson = Lesson.objects.create(schedule=schedule, hours=2)
+                students = Student.objects.filter(group=schedule.discipline.group)
+                attendance_type, _ = AttendanceType.objects.get_or_create(name='Присутствовал')
+                for student in students:
+                    Attendance.objects.create(lesson=lesson, student=student, attendance_type=attendance_type)
+            else:
+                lesson.hours = 2
+                lesson.save()
+
+            lesson.topic = request.POST.get('topic', '')
+            lesson_type_id = request.POST.get('lesson_type')
+            if lesson_type_id:
+                lesson.lesson_type_id = lesson_type_id
             lesson.save()
 
-        lesson.topic = request.POST.get('topic', '')
-        lesson_type_id = request.POST.get('lesson_type')
-        if lesson_type_id:
-            lesson.lesson_type_id = lesson_type_id
-        lesson.save()
+            messages.success(request, 'Занятие сохранено.')
+            return redirect('teacher_lesson', schedule_id=schedule.id)
 
-        if request.FILES.get('file'):
-            LessonFile.objects.create(
-                name=request.POST.get('file_name', request.FILES['file'].name),
+        elif 'add_task' in request.POST:
+            Task.objects.create(
+                name=request.POST.get('task_name'),
                 lesson=lesson,
-                file=request.FILES['file']
+                description=request.POST.get('task_description', '')
             )
-            messages.success(request, 'Файл загружен.')
+            messages.success(request, 'Задание добавлено.')
+            return redirect('teacher_lesson', schedule_id=schedule.id)
 
-        messages.success(request, 'Занятие сохранено.')
-        return redirect('teacher_lesson', schedule_id=schedule.id)
+        elif 'upload_file' in request.POST:
+            if request.FILES.get('file'):
+                LessonFile.objects.create(
+                    name=request.POST.get('file_name', request.FILES['file'].name),
+                    lesson=lesson,
+                    file=request.FILES['file']
+                )
+                messages.success(request, 'Файл загружен.')
+            return redirect('teacher_lesson', schedule_id=schedule.id)
 
     created = lesson is None
 
     lesson_types = LessonType.objects.all()
     files = LessonFile.objects.filter(lesson=lesson) if lesson else []
+    tasks = Task.objects.filter(lesson=lesson) if lesson else []
 
     context = {
         'teacher': teacher,
@@ -463,5 +476,6 @@ def teacher_lesson(request, schedule_id):
         'created': created,
         'lesson_types': lesson_types,
         'files': files,
+        'tasks': tasks,
     }
     return render(request, 'users/teacher/lesson.html', context)
