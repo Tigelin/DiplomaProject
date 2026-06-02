@@ -1,15 +1,15 @@
 {% extends "journal/base.html" %}
 {% load dict_extras %}
 
-{% block title %}Оценки за задание - {{ task.name }}{% endblock %}
+{% block title %}Задание - {{ task.name }}{% endblock %}
 
 {% block breadcrumbs %}
 
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
     <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Личный кабинет</a></li>
     <li class="breadcrumb-item"><a href="{% url 'teacher_groups' %}">Мои группы</a></li>
-    <li class="breadcrumb-item"><a href="{% url 'teacher_journal' task.lesson.schedule.discipline.id %}">Журнал оценок</a></li>
-    <li class="breadcrumb-item"><a href="{% url 'teacher_lesson' task.lesson.schedule.id %}">Занятие</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_journal' schedule.discipline.id %}">Журнал оценок</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_lesson' lesson.schedule.id %}">Занятие</a></li>
     <li class="breadcrumb-item active">{{ task.name }}</li>
 
 {% endblock %}
@@ -18,21 +18,53 @@
 
 <div class="card">
     <div class="card-header bg-primary text-white">
-        <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill"></i> Оценки за задание: {{ task.name }}</h4>
+        <h4 class="mb-0"><i class="bi bi-pencil-square"></i> {{ task.name }}</h4>
     </div>
     <div class="card-body">
-        
+
         <div class="alert alert-info">
-            <strong>Дисциплина:</strong> {{ task.lesson.schedule.discipline.plan.name }}<br>
-            <strong>Группа:</strong> {{ task.lesson.schedule.discipline.group.name }}<br>
-            <strong>Дата занятия:</strong> {{ task.lesson.schedule.date|date:"d.m.Y" }}<br>
-            <strong>Тема занятия:</strong> {{ task.lesson.topic|default:"—" }}
+            <strong>Дисциплина:</strong> {{ schedule.discipline.plan.name }}<br>
+            <strong>Группа:</strong> {{ schedule.discipline.group.name }}<br>
+            <strong>Дата занятия:</strong> {{ schedule.date|date:"d.m.Y" }}<br>
+            <strong>Тема занятия:</strong> {{ lesson.topic|default:"—" }}
         </div>
-        
+
         <form method="post">
             {% csrf_token %}
-            
-            <div class="table-responsive">
+
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Название задания</label>
+                    <input type="text" name="task_name" class="form-control" value="{{ task.name }}" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Описание задания</label>
+                    <input type="text" name="task_description" class="form-control" value="{{ task.description }}">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <button type="submit" name="save" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Сохранить задание
+                    </button>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="submit" name="delete" class="btn btn-danger" onclick="return confirm('Удалить задание? Все оценки будут потеряны.')">
+                        <i class="bi bi-trash"></i> Удалить задание
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <hr>
+
+        <h5 class="mt-4">Оценки студентов</h5>
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="table-responsive mt-3">
                 <table class="table table-striped table-hover">
                     <thead class="table-dark">
                         <tr>
@@ -63,12 +95,12 @@
                     </tbody>
                 </table>
             </div>
-            
-            <button type="submit" class="btn btn-primary mt-3">
-                <i class="bi bi-save"></i> Сохранить оценки
+
+            <button type="submit" name="save" class="btn btn-success mt-3">
+                <i class="bi bi-check-circle"></i> Сохранить оценки
             </button>
-            
-            <a href="{% url 'teacher_lesson' task.lesson.schedule.id %}" class="btn btn-secondary mt-3">
+
+            <a href="{% url 'teacher_lesson' lesson.schedule.id %}" class="btn btn-secondary mt-3">
                 <i class="bi bi-arrow-left"></i> Назад к занятию
             </a>
         </form>

@@ -373,21 +373,24 @@ def teacher_journal(request, discipline_id):
     ).select_related('classroom').order_by('date', 'lesson_number')
 
     for schedule in schedules:
-        schedule.has_lesson = Lesson.objects.filter(schedule=schedule).exists()
+        lesson = Lesson.objects.filter(schedule=schedule).first()
+        schedule.has_lesson = lesson is not None
         if schedule.has_lesson:
-            lesson = Lesson.objects.get(schedule=schedule)
+            schedule.lesson = lesson
             schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
             schedule.tasks = Task.objects.filter(lesson=lesson)
         else:
             schedule.lesson_type = None
             schedule.tasks = []
+            schedule.lesson = None
 
     grades_matrix = {}
     for student in students:
         grades_matrix[student.id] = {}
         for schedule in schedules:
-            for task in schedule.tasks:
-                grades_matrix[student.id][task.id] = None
+            if schedule.has_lesson:
+                for task in schedule.tasks:
+                    grades_matrix[student.id][task.id] = None
 
     grades = Grade.objects.filter(
         task__lesson__schedule__discipline=discipline
@@ -484,33 +487,56 @@ def teacher_lesson(request, schedule_id):
 
 
 @login_required
-def teacher_task_grades(request, task_id):
+def teacher_task_grades(request, task_id=None, lesson_id=None):
     try:
         teacher = request.user.teacher
     except:
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    task = get_object_or_404(Task, id=task_id)
+    if task_id:
+        task = get_object_or_404(Task, id=task_id)
+        lesson = task.lesson
+        schedule = lesson.schedule
+    else:
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        schedule = lesson.schedule
+        task, created = Task.objects.get_or_create(
+            lesson=lesson,
+            name='Новое задание'
+        )
 
-    if task.lesson.schedule.discipline.teacher != teacher:
-        messages.error(request, 'У вас нет доступа к этому заданию.')
+    if schedule.discipline.teacher != teacher:
+        messages.error(request, 'У вас нет доступа.')
         return redirect('teacher_groups')
 
-    students = Student.objects.filter(group=task.lesson.schedule.discipline.group).select_related('user').order_by(
+    students = Student.objects.filter(group=schedule.discipline.group).select_related('user').order_by(
         'user__last_name')
 
     if request.method == 'POST':
-        for student in students:
-            grade_value = request.POST.get(f'grade_{student.id}')
-            if grade_value and grade_value.isdigit():
-                grade, created = Grade.objects.update_or_create(
-                    task=task,
-                    student=student,
-                    defaults={'value': int(grade_value)}
-                )
-        messages.success(request, 'Оценки сохранены.')
-        return redirect('teacher_task_grades', task_id=task.id)
+        if 'delete' in request.POST:
+            task.delete()
+            messages.success(request, 'Задание удалено.')
+            return redirect('teacher_journal', discipline_id=schedule.discipline.id)
+
+        else:
+            task.name = request.POST.get('task_name')
+            task.description = request.POST.get('task_description')
+            task.save()
+
+            for student in students:
+                grade_value = request.POST.get(f'grade_{student.id}')
+                if grade_value and grade_value.isdigit() and 1 <= int(grade_value) <= 5:
+                    Grade.objects.update_or_create(
+                        task=task,
+                        student=student,
+                        defaults={'value': int(grade_value)}
+                    )
+                elif grade_value == '':
+                    Grade.objects.filter(task=task, student=student).delete()
+
+            messages.success(request, 'Задание и оценки сохранены.')
+            return redirect('teacher_task_grades', task_id=task.id)
 
     grades = {}
     for student in students:
@@ -520,7 +546,28 @@ def teacher_task_grades(request, task_id):
     context = {
         'teacher': teacher,
         'task': task,
+        'schedule': schedule,
+        'lesson': lesson,
         'students': students,
         'grades': grades,
     }
     return render(request, 'users/teacher/task_grades.html', context)
+
+
+@login_required
+def teacher_task_create(request, lesson_id):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+
+    if lesson.schedule.discipline.teacher != teacher:
+        messages.error(request, 'У вас нет доступа.')
+        return redirect('teacher_groups')
+
+    task = Task.objects.create(lesson=lesson, name='Новое задание')
+
+    return redirect('teacher_task_grades', task_id=task.id)
