@@ -33,6 +33,11 @@
                     </select>
                 </form>
             </div>
+            <div class="col-md-8 text-end">
+                <a href="{% url 'export_journal_excel' discipline.id %}" class="btn btn-success">
+                    <i class="bi bi-file-earmark-excel"></i> Выгрузить в Excel
+                </a>
+            </div>
         </div>
 
         {% if students and schedules %}

@@ -4,6 +4,11 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student, Schedule, LessonType, AttendanceType
+import openpyxl
+from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+from django.http import HttpResponse
+from urllib.parse import quote
+from datetime import datetime
 
 # Create your views here.
 
@@ -585,3 +590,198 @@ def teacher_task_create(request, lesson_id):
     task = Task.objects.create(lesson=lesson, name='Новое задание')
 
     return redirect('teacher_task_grades', task_id=task.id)
+
+
+@login_required
+def export_journal_excel(request, discipline_id):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    discipline = get_object_or_404(Discipline, id=discipline_id)
+
+    if discipline.teacher != teacher:
+        messages.error(request, 'У вас нет доступа к этой дисциплине.')
+        return redirect('teacher_groups')
+
+    students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
+
+    schedules = Schedule.objects.filter(
+        discipline=discipline
+    ).select_related('classroom').order_by('date', 'lesson_number')
+
+    for schedule in schedules:
+        lesson = Lesson.objects.filter(schedule=schedule).first()
+        schedule.has_lesson = lesson is not None
+        if schedule.has_lesson:
+            schedule.lesson = lesson
+            schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
+            schedule.tasks = Task.objects.filter(lesson=lesson)
+            schedule.topic = lesson.topic if lesson.topic else '—'
+        else:
+            schedule.lesson_type = None
+            schedule.tasks = []
+            schedule.lesson = None
+            schedule.topic = None
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"Журнал_{discipline.plan.name}"
+
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+
+    header_fill = PatternFill(start_color="2c3e50", end_color="2c3e50", fill_type="solid")
+    header_font = Font(color="ffffff", bold=True)
+    center_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    row = 1
+    col = 1
+
+    ws.cell(row=row, column=col).value = "Журнал оценок"
+    ws.cell(row=row, column=col).font = Font(bold=True, size=14)
+    ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1 + len(schedules))
+    row += 2
+
+    ws.cell(row=row, column=col).value = f"Дисциплина: {discipline.plan.name}"
+    ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1 + len(schedules))
+    row += 1
+
+    ws.cell(row=row, column=col).value = f"Группа: {discipline.group.name}"
+    ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1 + len(schedules))
+    row += 1
+
+    ws.cell(row=row,
+            column=col).value = f"Преподаватель: {teacher.user.last_name} {teacher.user.first_name} {teacher.user.patronymic}"
+    ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1 + len(schedules))
+    row += 2
+
+    first_header_row = row
+    col = 1
+
+    ws.cell(row=first_header_row, column=col).value = "№"
+    ws.cell(row=first_header_row, column=col).fill = header_fill
+    ws.cell(row=first_header_row, column=col).font = header_font
+    ws.cell(row=first_header_row, column=col).alignment = center_alignment
+    ws.cell(row=first_header_row, column=col).border = thin_border
+    col += 1
+
+    ws.cell(row=first_header_row, column=col).value = "Студент"
+    ws.cell(row=first_header_row, column=col).fill = header_fill
+    ws.cell(row=first_header_row, column=col).font = header_font
+    ws.cell(row=first_header_row, column=col).alignment = center_alignment
+    ws.cell(row=first_header_row, column=col).border = thin_border
+    col += 1
+
+    for schedule in schedules:
+        if schedule.has_lesson and schedule.tasks:
+            first_col = col
+            for task in schedule.tasks:
+                col += 1
+            last_col = col - 1
+            cell_value = f"{schedule.date.strftime('%d.%m.%Y')} ({schedule.lesson_number} пара)\n{schedule.topic}"
+            ws.cell(row=first_header_row, column=first_col).value = cell_value
+            ws.cell(row=first_header_row, column=first_col).fill = header_fill
+            ws.cell(row=first_header_row, column=first_col).font = header_font
+            ws.cell(row=first_header_row, column=first_col).alignment = center_alignment
+            ws.cell(row=first_header_row, column=first_col).border = thin_border
+            if first_col != last_col:
+                ws.merge_cells(start_row=first_header_row, start_column=first_col, end_row=first_header_row,
+                               end_column=last_col)
+        elif schedule.has_lesson:
+            cell_value = f"{schedule.date.strftime('%d.%m.%Y')} ({schedule.lesson_number} пара)\n{schedule.topic}"
+            ws.cell(row=first_header_row, column=col).value = cell_value
+            ws.cell(row=first_header_row, column=col).fill = header_fill
+            ws.cell(row=first_header_row, column=col).font = header_font
+            ws.cell(row=first_header_row, column=col).alignment = center_alignment
+            ws.cell(row=first_header_row, column=col).border = thin_border
+            col += 1
+
+    second_header_row = first_header_row + 1
+    col = 1
+
+    for i in range(1, 3):
+        ws.cell(row=second_header_row, column=i).value = ""
+        ws.cell(row=second_header_row, column=i).fill = header_fill
+        ws.cell(row=second_header_row, column=i).border = thin_border
+        if i == 1:
+            ws.merge_cells(start_row=first_header_row, start_column=1, end_row=second_header_row, end_column=1)
+        elif i == 2:
+            ws.merge_cells(start_row=first_header_row, start_column=2, end_row=second_header_row, end_column=2)
+
+    col = 3
+
+    for schedule in schedules:
+        if schedule.has_lesson and schedule.tasks:
+            for task in schedule.tasks:
+                ws.cell(row=second_header_row, column=col).value = task.name
+                ws.cell(row=second_header_row, column=col).fill = header_fill
+                ws.cell(row=second_header_row, column=col).font = header_font
+                ws.cell(row=second_header_row, column=col).alignment = center_alignment
+                ws.cell(row=second_header_row, column=col).border = thin_border
+                col += 1
+        elif schedule.has_lesson:
+            col += 1
+
+    ws.row_dimensions[first_header_row].height = 40
+    ws.row_dimensions[second_header_row].height = 30
+
+    row = second_header_row + 1
+
+    for idx, student in enumerate(students, start=1):
+        col = 1
+        ws.cell(row=row, column=col).value = idx
+        ws.cell(row=row, column=col).alignment = center_alignment
+        ws.cell(row=row, column=col).border = thin_border
+        col += 1
+
+        ws.cell(row=row,
+                column=col).value = f"{student.user.last_name} {student.user.first_name} {student.user.patronymic}"
+        ws.cell(row=row, column=col).alignment = left_alignment
+        ws.cell(row=row, column=col).border = thin_border
+        col += 1
+
+        for schedule in schedules:
+            if schedule.has_lesson and schedule.tasks:
+                for task in schedule.tasks:
+                    grade = Grade.objects.filter(task=task, student=student).first()
+                    grade_value = grade.value if grade else ''
+                    ws.cell(row=row, column=col).value = grade_value
+                    ws.cell(row=row, column=col).alignment = center_alignment
+                    ws.cell(row=row, column=col).border = thin_border
+
+                    if grade_value == 1 or grade_value == 2:
+                        ws.cell(row=row, column=col).fill = PatternFill(start_color="ffcccc", end_color="ffcccc",
+                                                                        fill_type="solid")
+                    elif grade_value == 3:
+                        ws.cell(row=row, column=col).fill = PatternFill(start_color="ffffcc", end_color="ffffcc",
+                                                                        fill_type="solid")
+                    elif grade_value == 4 or grade_value == 5:
+                        ws.cell(row=row, column=col).fill = PatternFill(start_color="ccffcc", end_color="ccffcc",
+                                                                        fill_type="solid")
+
+                    col += 1
+            elif schedule.has_lesson:
+                ws.cell(row=row, column=col).value = ''
+                ws.cell(row=row, column=col).alignment = center_alignment
+                ws.cell(row=row, column=col).border = thin_border
+                col += 1
+
+        row += 1
+
+    for col_num in range(1, ws.max_column + 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 15
+
+    current_date = datetime.now().strftime('%d.%m.%Y')
+    filename = f"{discipline.plan.name}_{discipline.group.name}_{current_date}.xlsx"
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    wb.save(response)
+    return response
