@@ -65,11 +65,11 @@
                             <i class="bi bi-person-circle"></i> {{ user.get_short_name|default:user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            {% if user.role.name == 'student' %}
+                            {% if user.role.name == 'Студент' %}
                                 <li><a class="dropdown-item" href="{% url 'student_dashboard' %}">
                                     <i class="bi bi-speedometer2"></i> Личный кабинет
                                 </a></li>
-                            {% elif user.role.name == 'teacher' %}
+                            {% elif user.role.name == 'Преподаватель' %}
                                 <li><a class="dropdown-item" href="{% url 'teacher_dashboard' %}">
                                     <i class="bi bi-speedometer2"></i> Личный кабинет
                                 </a></li>
