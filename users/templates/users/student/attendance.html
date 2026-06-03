@@ -65,7 +65,7 @@
             </small>
         </div>
 
-        {% if dates %}
+        {% if lessons %}
 
             <div class="table-responsive">
                 <table class="table table-bordered text-center align-middle">
@@ -73,9 +73,12 @@
                         <tr>
                             <th style="min-width: 150px">Дисциплина</th>
 
-                            {% for date in dates %}
+                            {% for lesson in lessons %}
 
-                                <th style="min-width: 80px">{{ date|date:"d.m.Y" }}</th>
+                                <th style="min-width: 80px">
+                                    {{ lesson.date|date:"d.m.Y" }}<br>
+                                    <small>{{ lesson.lesson_number }} пара</small>
+                                </th>
 
                             {% endfor %}
 
@@ -88,11 +91,11 @@
                             <tr>
                                 <th class="bg-light text-start">{{ discipline_name }}</th>
 
-                                {% for date in dates %}
+                                {% for lesson in lessons %}
 
                                     <td>
 
-                                        {% with matrix|get_by_key:discipline_id|get_by_key:date as status %}
+                                        {% with matrix|get_by_key:discipline_id|get_by_key:lesson.date|get_by_key:lesson.lesson_number as status %}
 
                                             {% if status %}
 
@@ -130,7 +133,7 @@
 
                                 {% endfor %}
 
-                            </td>
+                            </tr>
 
                         {% endfor %}
 

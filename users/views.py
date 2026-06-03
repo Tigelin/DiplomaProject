@@ -259,7 +259,7 @@ def student_attendance(request):
         'lesson__schedule__discipline__plan',
         'lesson__schedule',
         'attendance_type'
-    ).order_by('lesson__schedule__date')
+    ).order_by('lesson__schedule__date', 'lesson__schedule__lesson_number')
 
     disciplines_dict = {}
     for att in attendances:
@@ -268,24 +268,32 @@ def student_attendance(request):
         if discipline_id not in disciplines_dict:
             disciplines_dict[discipline_id] = discipline_name
 
-    dates_dict = {}
+    lessons_dict = {}
     for att in attendances:
-        date = att.lesson.schedule.date
-        if date not in dates_dict:
-            dates_dict[date] = date
+        lesson_id = att.lesson.id
+        lesson_date = att.lesson.schedule.date
+        lesson_number = att.lesson.schedule.lesson_number
+        if lesson_id not in lessons_dict:
+            lessons_dict[lesson_id] = {
+                'date': lesson_date,
+                'lesson_number': lesson_number,
+                'discipline_id': att.lesson.schedule.discipline.id
+            }
 
-    sorted_dates = sorted(dates_dict.keys())
+    sorted_lessons = sorted(lessons_dict.values(), key=lambda x: (x['date'], x['lesson_number']))
 
     matrix = {}
     for discipline_id in disciplines_dict:
         matrix[discipline_id] = {}
-        for date in sorted_dates:
-            matrix[discipline_id][date] = None
+        for lesson in sorted_lessons:
+            matrix[discipline_id][lesson['date']] = matrix[discipline_id].get(lesson['date'], {})
+            matrix[discipline_id][lesson['date']][lesson['lesson_number']] = None
 
     for att in attendances:
         discipline_id = att.lesson.schedule.discipline.id
         date = att.lesson.schedule.date
-        matrix[discipline_id][date] = att.attendance_type.name
+        lesson_number = att.lesson.schedule.lesson_number
+        matrix[discipline_id][date][lesson_number] = att.attendance_type.name
 
     total = attendances.count()
     present = attendances.filter(attendance_type__name='Присутствовал').count()
@@ -295,7 +303,7 @@ def student_attendance(request):
     context = {
         'student': student,
         'disciplines': disciplines_dict.items(),
-        'dates': sorted_dates,
+        'lessons': sorted_lessons,
         'matrix': matrix,
         'total': total,
         'present': present,
