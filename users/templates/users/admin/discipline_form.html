@@ -1,0 +1,80 @@
+{% extends "journal/base.html" %}
+
+{% block title %}
+    {% if discipline %}Редактирование{% else %}Добавление{% endif %} дисциплины
+{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_disciplines' %}">Дисциплины</a></li>
+    <li class="breadcrumb-item active">
+        {% if discipline %}Редактирование{% else %}Добавление{% endif %}
+    </li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-journal-bookmark-fill"></i>
+            {% if discipline %}Редактирование{% else %}Добавление{% endif %} дисциплины
+        </h4>
+    </div>
+    <div class="card-body">
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label">План дисциплины</label>
+                <select name="plan_id" class="form-select" required>
+                    <option value="">-- Выберите --</option>
+                    {% for plan in plans %}
+                        <option value="{{ plan.id }}" {% if discipline.plan.id == plan.id %}selected{% endif %}>
+                            {{ plan.name }} ({{ plan.total_hours }} ч.)
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Группа</label>
+                <select name="group_id" class="form-select" required>
+                    <option value="">-- Выберите --</option>
+                    {% for group in groups %}
+                        <option value="{{ group.id }}" {% if discipline.group.id == group.id %}selected{% endif %}>
+                            {{ group.name }} ({{ group.year }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Преподаватель</label>
+                <select name="teacher_id" class="form-select" required>
+                    <option value="">-- Выберите --</option>
+                    {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}" {% if discipline.teacher.id == teacher.id %}selected{% endif %}>
+                            {{ teacher.user.get_full_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Сохранить
+            </button>
+            
+            <a href="{% url 'admin_disciplines' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Отмена
+            </a>
+        </form>
+        
+    </div>
+</div>
+
+{% endblock %}

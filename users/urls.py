@@ -29,4 +29,8 @@ urlpatterns = [
     path('admin/discipline-plan/create/', views.admin_discipline_plan_create, name='admin_discipline_plan_create'),
     path('admin/discipline-plan/edit/<int:plan_id>/', views.admin_discipline_plan_edit, name='admin_discipline_plan_edit'),
     path('admin/discipline-plan/delete/<int:plan_id>/', views.admin_discipline_plan_delete, name='admin_discipline_plan_delete'),
+    path('admin/disciplines/', views.admin_disciplines, name='admin_disciplines'),
+    path('admin/discipline/create/', views.admin_discipline_create, name='admin_discipline_create'),
+    path('admin/discipline/edit/<int:discipline_id>/', views.admin_discipline_edit, name='admin_discipline_edit'),
+    path('admin/discipline/delete/<int:discipline_id>/', views.admin_discipline_delete, name='admin_discipline_delete'),
 ]
