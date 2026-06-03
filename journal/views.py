@@ -10,7 +10,7 @@ from .models import (
     Classroom, Schedule, ContactMessage, MessageStatus,
     DisciplinePlan
 )
-from django.db import models
+from django.db.models import Q
 
 def home(request):
     return render(request, 'journal/home.html')
@@ -22,9 +22,9 @@ def teachers_list(request):
     search = request.GET.get('search', '')
     if search:
         teachers = teachers.filter(
-            models.Q(user__last_name__icontains=search) |
-            models.Q(user__first_name__icontains=search) |
-            models.Q(user__patronymic__icontains=search)
+            Q(user__last_name__icontains=search) |
+            Q(user__first_name__icontains=search) |
+            Q(user__patronymic__icontains=search)
         )
 
     context = {
@@ -45,8 +45,22 @@ def groups_list(request):
 
 
 def disciplines_list(request):
-    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher').all()
-    return render(request, 'journal/disciplines.html', {'disciplines': disciplines})
+    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').all()
+
+    search = request.GET.get('search', '')
+    if search:
+        disciplines = disciplines.filter(
+            Q(plan__name__icontains=search) |
+            Q(group__name__icontains=search) |
+            Q(teacher__user__last_name__icontains=search) |
+            Q(teacher__user__first_name__icontains=search)
+        )
+
+    context = {
+        'disciplines': disciplines,
+        'search': search,
+    }
+    return render(request, 'journal/disciplines.html', context)
 
 
 def discipline_plans_list(request):
