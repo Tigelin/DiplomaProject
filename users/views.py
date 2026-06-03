@@ -515,43 +515,38 @@ def teacher_lesson(request, schedule_id):
 
 
 @login_required
-def teacher_task_grades(request, task_id=None, lesson_id=None):
+def teacher_task_grades(request, task_id):
     try:
         teacher = request.user.teacher
     except:
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    if task_id:
-        task = get_object_or_404(Task, id=task_id)
-        lesson = task.lesson
-        schedule = lesson.schedule
-    else:
-        lesson = get_object_or_404(Lesson, id=lesson_id)
-        schedule = lesson.schedule
-        task, created = Task.objects.get_or_create(
-            lesson=lesson,
-            name='Новое задание'
-        )
+    task = get_object_or_404(Task, id=task_id)
+    lesson = task.lesson
+    schedule = lesson.schedule
 
     if schedule.discipline.teacher != teacher:
-        messages.error(request, 'У вас нет доступа.')
+        messages.error(request, 'У вас нет доступа к этому заданию.')
         return redirect('teacher_groups')
 
     students = Student.objects.filter(group=schedule.discipline.group).select_related('user').order_by(
         'user__last_name')
 
     if request.method == 'POST':
-        if 'delete' in request.POST:
+        if 'delete_task' in request.POST:
             task.delete()
             messages.success(request, 'Задание удалено.')
             return redirect('teacher_journal', discipline_id=schedule.discipline.id)
 
-        else:
+        elif 'save_task' in request.POST:
             task.name = request.POST.get('task_name')
-            task.description = request.POST.get('task_description')
+            task.description = request.POST.get('task_description', '')
             task.save()
+            messages.success(request, 'Задание сохранено.')
+            return redirect('teacher_task_grades', task_id=task.id)
 
+        elif 'save_grades' in request.POST:
             for student in students:
                 grade_value = request.POST.get(f'grade_{student.id}')
                 if grade_value and grade_value.isdigit() and 1 <= int(grade_value) <= 5:
@@ -562,8 +557,7 @@ def teacher_task_grades(request, task_id=None, lesson_id=None):
                     )
                 elif grade_value == '':
                     Grade.objects.filter(task=task, student=student).delete()
-
-            messages.success(request, 'Задание и оценки сохранены.')
+            messages.success(request, 'Оценки сохранены.')
             return redirect('teacher_task_grades', task_id=task.id)
 
     grades = {}
@@ -574,8 +568,8 @@ def teacher_task_grades(request, task_id=None, lesson_id=None):
     context = {
         'teacher': teacher,
         'task': task,
-        'schedule': schedule,
         'lesson': lesson,
+        'schedule': schedule,
         'students': students,
         'grades': grades,
     }
