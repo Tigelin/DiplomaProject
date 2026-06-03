@@ -276,20 +276,46 @@ class GradeAdmin(admin.ModelAdmin):
 
 
 @admin.register(Attendance)
-class AttendanceAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
+class AttendanceAdmin(admin.ModelAdmin):
     list_display = ('id', 'lesson', 'student', 'attendance_type')
     list_filter = ('attendance_type', 'lesson__schedule__discipline__group')
     search_fields = ('student__user__last_name',)
+    actions = ['set_present', 'set_late', 'set_sick', 'set_excused', 'set_absent']
 
-    def get_add_url_with_data(self, request, obj):
-        return f"{reverse('admin:journal_attendance_add')}?lesson={obj.lesson.id}&student={obj.student.id}&attendance_type={obj.attendance_type.id}"
+    def set_present(self, request, queryset):
+        attendance_type, _ = AttendanceType.objects.get_or_create(name='Присутствовал')
+        updated = queryset.update(attendance_type=attendance_type)
+        self.message_user(request, f'У {updated} записей установлено "Присутствовал".')
 
-    def get_changeform_initial_data(self, request):
-        return {
-            'lesson': request.GET.get('lesson'),
-            'student': request.GET.get('student'),
-            'attendance_type': request.GET.get('attendance_type'),
-        }
+    set_present.short_description = 'Отметить как присутствовал'
+
+    def set_late(self, request, queryset):
+        attendance_type, _ = AttendanceType.objects.get_or_create(name='Опоздал')
+        updated = queryset.update(attendance_type=attendance_type)
+        self.message_user(request, f'У {updated} записей установлено "Опоздал".')
+
+    set_late.short_description = 'Отметить как опоздал'
+
+    def set_sick(self, request, queryset):
+        attendance_type, _ = AttendanceType.objects.get_or_create(name='Отсутствовал по болезни')
+        updated = queryset.update(attendance_type=attendance_type)
+        self.message_user(request, f'У {updated} записей установлено "Отсутствовал по болезни".')
+
+    set_sick.short_description = 'Отметить как больной'
+
+    def set_excused(self, request, queryset):
+        attendance_type, _ = AttendanceType.objects.get_or_create(name='Отсутствовал по уважительной причине')
+        updated = queryset.update(attendance_type=attendance_type)
+        self.message_user(request, f'У {updated} записей установлено "Отсутствовал по уважительной причине".')
+
+    set_excused.short_description = 'Отметить как отсутствие по уважительной причине'
+
+    def set_absent(self, request, queryset):
+        attendance_type, _ = AttendanceType.objects.get_or_create(name='Отсутствовал без причины')
+        updated = queryset.update(attendance_type=attendance_type)
+        self.message_user(request, f'У {updated} записей установлено "Отсутствовал без причины".')
+
+    set_absent.short_description = 'Отметить как отсутствие без причины'
 
 
 @admin.register(AttendanceType)
