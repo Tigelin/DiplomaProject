@@ -10,6 +10,7 @@ from .models import (
     Classroom, Schedule, ContactMessage, MessageStatus,
     DisciplinePlan
 )
+from django.db import models
 
 def home(request):
     return render(request, 'journal/home.html')
@@ -17,7 +18,20 @@ def home(request):
 
 def teachers_list(request):
     teachers = Teacher.objects.select_related('user').all()
-    return render(request, 'journal/teachers.html', {'teachers': teachers})
+
+    search = request.GET.get('search', '')
+    if search:
+        teachers = teachers.filter(
+            models.Q(user__last_name__icontains=search) |
+            models.Q(user__first_name__icontains=search) |
+            models.Q(user__patronymic__icontains=search)
+        )
+
+    context = {
+        'teachers': teachers,
+        'search': search,
+    }
+    return render(request, 'journal/teachers.html', context)
 
 
 def departments_list(request):
