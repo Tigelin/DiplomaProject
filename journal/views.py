@@ -41,7 +41,20 @@ def departments_list(request):
 
 def groups_list(request):
     groups = Group.objects.select_related('department').all()
-    return render(request, 'journal/groups.html', {'groups': groups})
+
+    search = request.GET.get('search', '')
+    if search:
+        groups = groups.filter(
+            Q(name__icontains=search) |
+            Q(year__icontains=search) |
+            Q(department__name__icontains=search)
+        )
+
+    context = {
+        'groups': groups,
+        'search': search,
+    }
+    return render(request, 'journal/groups.html', context)
 
 
 def disciplines_list(request):
