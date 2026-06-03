@@ -1,0 +1,78 @@
+{% extends "journal/base.html" %}
+
+{% block title %}
+    {% if schedule %}Редактирование{% else %}Добавление{% endif %} расписания
+{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_schedules' %}">Расписание</a></li>
+    <li class="breadcrumb-item active">
+        {% if schedule %}Редактирование{% else %}Добавление{% endif %}
+    </li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-calendar-plus"></i>
+            {% if schedule %}Редактирование{% else %}Добавление{% endif %} расписания
+        </h4>
+    </div>
+    <div class="card-body">
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label">Дисциплина</label>
+                <select name="discipline_id" class="form-select" required>
+                    <option value="">-- Выберите --</option>
+                    {% for discipline in disciplines %}
+                        <option value="{{ discipline.id }}" {% if schedule.discipline.id == discipline.id %}selected{% endif %}>
+                            {{ discipline.plan.name }} ({{ discipline.group.name }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Кабинет</label>
+                <select name="classroom_id" class="form-select" required>
+                    <option value="">-- Выберите --</option>
+                    {% for classroom in classrooms %}
+                        <option value="{{ classroom.id }}" {% if schedule.classroom.id == classroom.id %}selected{% endif %}>
+                            {{ classroom.number }} ({{ classroom.department.name }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Дата</label>
+                <input type="date" name="date" class="form-control" value="{{ schedule.date|date:'Y-m-d' }}" required>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Номер пары</label>
+                <input type="number" name="lesson_number" class="form-control" value="{{ schedule.lesson_number }}" min="1" max="7" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Сохранить
+            </button>
+            
+            <a href="{% url 'admin_schedules' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Отмена
+            </a>
+        </form>
+        
+    </div>
+</div>
+
+{% endblock %}

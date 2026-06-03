@@ -940,3 +940,127 @@ def export_journal_docx(request, discipline_id):
 @staff_member_required
 def admin_dashboard(request):
     return render(request, 'users/admin/dashboard.html')
+
+
+@staff_member_required
+def admin_schedules(request):
+    schedules = Schedule.objects.select_related('discipline__plan', 'discipline__group', 'classroom').order_by('date',
+                                                                                                               'lesson_number')
+
+    context = {
+        'schedules': schedules,
+    }
+    return render(request, 'users/admin/schedules.html', context)
+
+
+@staff_member_required
+def admin_schedule_create(request):
+    if request.method == 'POST':
+        discipline_id = request.POST.get('discipline_id')
+        classroom_id = request.POST.get('classroom_id')
+        date = request.POST.get('date')
+        lesson_number = request.POST.get('lesson_number')
+
+        try:
+            lesson_number = int(lesson_number)
+            if lesson_number < 1 or lesson_number > 7:
+                messages.error(request, 'Номер пары должен быть от 1 до 7.')
+                disciplines = Discipline.objects.select_related('plan', 'group').all()
+                classrooms = Classroom.objects.all()
+                context = {
+                    'disciplines': disciplines,
+                    'classrooms': classrooms,
+                }
+                return render(request, 'users/admin/schedule_form.html', context)
+        except (ValueError, TypeError):
+            messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
+            disciplines = Discipline.objects.select_related('plan', 'group').all()
+            classrooms = Classroom.objects.all()
+            context = {
+                'disciplines': disciplines,
+                'classrooms': classrooms,
+            }
+            return render(request, 'users/admin/schedule_form.html', context)
+
+        Schedule.objects.create(
+            discipline_id=discipline_id,
+            classroom_id=classroom_id,
+            date=date,
+            lesson_number=lesson_number
+        )
+        messages.success(request, 'Расписание добавлено.')
+        return redirect('admin_schedules')
+
+    disciplines = Discipline.objects.select_related('plan', 'group').all()
+    classrooms = Classroom.objects.all()
+
+    context = {
+        'disciplines': disciplines,
+        'classrooms': classrooms,
+    }
+    return render(request, 'users/admin/schedule_form.html', context)
+
+
+@staff_member_required
+def admin_schedule_edit(request, schedule_id):
+    schedule = get_object_or_404(Schedule, id=schedule_id)
+
+    if request.method == 'POST':
+        discipline_id = request.POST.get('discipline_id')
+        classroom_id = request.POST.get('classroom_id')
+        date = request.POST.get('date')
+        lesson_number = request.POST.get('lesson_number')
+
+        try:
+            lesson_number = int(lesson_number)
+            if lesson_number < 1 or lesson_number > 7:
+                messages.error(request, 'Номер пары должен быть от 1 до 7.')
+                disciplines = Discipline.objects.select_related('plan', 'group').all()
+                classrooms = Classroom.objects.all()
+                context = {
+                    'schedule': schedule,
+                    'disciplines': disciplines,
+                    'classrooms': classrooms,
+                }
+                return render(request, 'users/admin/schedule_form.html', context)
+        except (ValueError, TypeError):
+            messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
+            disciplines = Discipline.objects.select_related('plan', 'group').all()
+            classrooms = Classroom.objects.all()
+            context = {
+                'schedule': schedule,
+                'disciplines': disciplines,
+                'classrooms': classrooms,
+            }
+            return render(request, 'users/admin/schedule_form.html', context)
+
+        schedule.discipline_id = discipline_id
+        schedule.classroom_id = classroom_id
+        schedule.date = date
+        schedule.lesson_number = lesson_number
+        schedule.save()
+        messages.success(request, 'Расписание обновлено.')
+        return redirect('admin_schedules')
+
+    disciplines = Discipline.objects.select_related('plan', 'group').all()
+    classrooms = Classroom.objects.all()
+
+    context = {
+        'schedule': schedule,
+        'disciplines': disciplines,
+        'classrooms': classrooms,
+    }
+    return render(request, 'users/admin/schedule_form.html', context)
+
+
+@staff_member_required
+def admin_schedule_delete(request, schedule_id):
+    schedule = get_object_or_404(Schedule, id=schedule_id)
+
+    if Lesson.objects.filter(schedule=schedule).exists():
+        messages.error(request, 'Нельзя удалить расписание, так как к нему уже прикреплено занятие.')
+        return redirect('admin_schedules')
+
+    schedule.delete()
+    messages.success(request, 'Расписание удалено.')
+    return redirect('admin_schedules')

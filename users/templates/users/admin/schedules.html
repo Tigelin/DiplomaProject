@@ -1,0 +1,71 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Управление расписанием{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item active">Расписание</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0"><i class="bi bi-calendar-week"></i> Управление расписанием</h4>
+        <a href="{% url 'admin_schedule_create' %}" class="btn btn-light btn-sm">
+            <i class="bi bi-plus"></i> Добавить
+        </a>
+    </div>
+    <div class="card-body">
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Дата</th>
+                        <th>Пара</th>
+                        <th>Дисциплина</th>
+                        <th>Группа</th>
+                        <th>Кабинет</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    {% for schedule in schedules %}
+                    <tr>
+                        <td>{{ schedule.date|date:"d.m.Y" }}</td>
+                        <td>{{ schedule.lesson_number }}</td>
+                        <td>{{ schedule.discipline.plan.name }}</td>
+                        <td>{{ schedule.discipline.group.name }}</td>
+                        <td>{{ schedule.classroom.number }}</td>
+                        <td>
+                            <a href="{% url 'admin_schedule_edit' schedule.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'admin_schedule_delete' schedule.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить?')">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center">Нет записей</td>
+                    </tr>
+                    {% endfor %}
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+        
+    </div>
+</div>
+
+{% endblock %}
