@@ -65,7 +65,16 @@ def disciplines_list(request):
 
 def discipline_plans_list(request):
     plans = DisciplinePlan.objects.all().order_by('name')
-    return render(request, 'journal/discipline_plans.html', {'plans': plans})
+
+    search = request.GET.get('search', '')
+    if search:
+        plans = plans.filter(name__icontains=search)
+
+    context = {
+        'plans': plans,
+        'search': search,
+    }
+    return render(request, 'journal/discipline_plans.html', context)
 
 
 def classrooms_list(request):

@@ -16,36 +16,49 @@
         <h4 class="mb-0"><i class="bi bi-journal-bookmark"></i> Планы дисциплин</h4>
     </div>
     <div class="card-body">
+
+        <form method="get" class="mb-4">
+            <div class="row g-2">
+                <div class="col-md-8">
+                    <input type="text" name="search" class="form-control" placeholder="Поиск по названию..." value="{{ search }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Искать
+                    </button>
+                </div>
+            </div>
+        </form>
+
         <div class="table-responsive">
             <table class="table table-striped table-hover">
                 <thead class="table-dark">
                     <tr>
                         <th>Название</th>
-                        <th>Количество часов</th>
+                        <th>Часы</th>
                     </tr>
                 </thead>
                 <tbody>
-
                     {% for plan in plans %}
-
                     <tr>
                         <td>{{ plan.name }}</td>
-                        <td>{{ plan.total_hours }}</td>
+                        <td>{{ plan.total_hours }} ч.</td>
                     </tr>
-
                     {% empty %}
-
                     <tr>
                         <td colspan="2" class="text-center">
-                            Нет планов дисциплин.
+                            Планы дисциплин не найдены.
                         </td>
                     </tr>
-
                     {% endfor %}
-
                 </tbody>
             </table>
         </div>
+
+        <a href="{% url 'home' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> На главную
+        </a>
+
     </div>
 </div>
 
