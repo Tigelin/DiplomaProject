@@ -13,6 +13,7 @@ from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Q
 from journal.models import (
     Grade, Task, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
@@ -947,8 +948,18 @@ def admin_schedules(request):
     schedules = Schedule.objects.select_related('discipline__plan', 'discipline__group', 'classroom').order_by('date',
                                                                                                                'lesson_number')
 
+    search = request.GET.get('search', '')
+    if search:
+        schedules = schedules.filter(
+            Q(discipline__plan__name__icontains=search) |
+            Q(discipline__group__name__icontains=search) |
+            Q(classroom__number__icontains=search) |
+            Q(date__icontains=search)
+        )
+
     context = {
         'schedules': schedules,
+        'search': search,
     }
     return render(request, 'users/admin/schedules.html', context)
 
@@ -1070,8 +1081,13 @@ def admin_schedule_delete(request, schedule_id):
 def admin_discipline_plans(request):
     plans = DisciplinePlan.objects.all().order_by('name')
 
+    search = request.GET.get('search', '')
+    if search:
+        plans = plans.filter(name__icontains=search)
+
     context = {
         'plans': plans,
+        'search': search,
     }
     return render(request, 'users/admin/discipline_plans.html', context)
 
@@ -1126,8 +1142,18 @@ def admin_discipline_plan_delete(request, plan_id):
 def admin_disciplines(request):
     disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').all()
 
+    search = request.GET.get('search', '')
+    if search:
+        disciplines = disciplines.filter(
+            Q(plan__name__icontains=search) |
+            Q(group__name__icontains=search) |
+            Q(teacher__user__last_name__icontains=search) |
+            Q(teacher__user__first_name__icontains=search)
+        )
+
     context = {
         'disciplines': disciplines,
+        'search': search,
     }
     return render(request, 'users/admin/disciplines.html', context)
 
