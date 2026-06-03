@@ -25,4 +25,8 @@ urlpatterns = [
     path('admin/schedule/create/', views.admin_schedule_create, name='admin_schedule_create'),
     path('admin/schedule/edit/<int:schedule_id>/', views.admin_schedule_edit, name='admin_schedule_edit'),
     path('admin/schedule/delete/<int:schedule_id>/', views.admin_schedule_delete, name='admin_schedule_delete'),
+    path('admin/discipline-plans/', views.admin_discipline_plans, name='admin_discipline_plans'),
+    path('admin/discipline-plan/create/', views.admin_discipline_plan_create, name='admin_discipline_plan_create'),
+    path('admin/discipline-plan/edit/<int:plan_id>/', views.admin_discipline_plan_edit, name='admin_discipline_plan_edit'),
+    path('admin/discipline-plan/delete/<int:plan_id>/', views.admin_discipline_plan_delete, name='admin_discipline_plan_delete'),
 ]

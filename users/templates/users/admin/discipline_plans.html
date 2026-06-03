@@ -1,0 +1,65 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Управление планами дисциплин{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item active">Планы дисциплин</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0"><i class="bi bi-book"></i> Управление планами дисциплин</h4>
+        <a href="{% url 'admin_discipline_plan_create' %}" class="btn btn-light btn-sm">
+            <i class="bi bi-plus"></i> Добавить
+        </a>
+    </div>
+    <div class="card-body">
+        
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Название</th>
+                        <th>Часы</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    {% for plan in plans %}
+                    <tr>
+                        <td>{{ plan.name }}</td>
+                        <td>{{ plan.total_hours }} ч.</td>
+                        <td>
+                            <a href="{% url 'admin_discipline_plan_edit' plan.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'admin_discipline_plan_delete' plan.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить план?')">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center">Нет записей</td>
+                    </tr>
+                    {% endfor %}
+                    
+                </tbody>
+            </table>
+        </div>
+        
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+        
+    </div>
+</div>
+
+{% endblock %}

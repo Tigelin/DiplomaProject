@@ -1,0 +1,54 @@
+{% extends "journal/base.html" %}
+
+{% block title %}
+    {% if plan %}Редактирование{% else %}Добавление{% endif %} плана дисциплины
+{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_discipline_plans' %}">Планы дисциплин</a></li>
+    <li class="breadcrumb-item active">
+        {% if plan %}Редактирование{% else %}Добавление{% endif %}
+    </li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-book"></i>
+            {% if plan %}Редактирование{% else %}Добавление{% endif %} плана дисциплины
+        </h4>
+    </div>
+    <div class="card-body">
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="mb-3">
+                <label class="form-label">Название</label>
+                <input type="text" name="name" class="form-control" value="{{ plan.name }}" required>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Количество часов</label>
+                <input type="number" name="total_hours" class="form-control" value="{{ plan.total_hours }}" min="1" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Сохранить
+            </button>
+            
+            <a href="{% url 'admin_discipline_plans' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Отмена
+            </a>
+        </form>
+        
+    </div>
+</div>
+
+{% endblock %}

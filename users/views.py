@@ -1064,3 +1064,59 @@ def admin_schedule_delete(request, schedule_id):
     schedule.delete()
     messages.success(request, 'Расписание удалено.')
     return redirect('admin_schedules')
+
+
+@staff_member_required
+def admin_discipline_plans(request):
+    plans = DisciplinePlan.objects.all().order_by('name')
+
+    context = {
+        'plans': plans,
+    }
+    return render(request, 'users/admin/discipline_plans.html', context)
+
+
+@staff_member_required
+def admin_discipline_plan_create(request):
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        total_hours = request.POST.get('total_hours')
+
+        DisciplinePlan.objects.create(
+            name=name,
+            total_hours=total_hours
+        )
+        messages.success(request, 'План дисциплины добавлен.')
+        return redirect('admin_discipline_plans')
+
+    return render(request, 'users/admin/discipline_plan_form.html')
+
+
+@staff_member_required
+def admin_discipline_plan_edit(request, plan_id):
+    plan = get_object_or_404(DisciplinePlan, id=plan_id)
+
+    if request.method == 'POST':
+        plan.name = request.POST.get('name')
+        plan.total_hours = request.POST.get('total_hours')
+        plan.save()
+        messages.success(request, 'План дисциплины обновлён.')
+        return redirect('admin_discipline_plans')
+
+    context = {
+        'plan': plan,
+    }
+    return render(request, 'users/admin/discipline_plan_form.html', context)
+
+
+@staff_member_required
+def admin_discipline_plan_delete(request, plan_id):
+    plan = get_object_or_404(DisciplinePlan, id=plan_id)
+
+    if Discipline.objects.filter(plan=plan).exists():
+        messages.error(request, 'Нельзя удалить план, так как он используется в дисциплинах.')
+        return redirect('admin_discipline_plans')
+
+    plan.delete()
+    messages.success(request, 'План дисциплины удалён.')
+    return redirect('admin_discipline_plans')
