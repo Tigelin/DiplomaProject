@@ -231,20 +231,48 @@ class LessonFileAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
 
 
 @admin.register(Grade)
-class GradeAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
+class GradeAdmin(admin.ModelAdmin):
     list_display = ('id', 'value', 'task', 'student', 'created_at')
     list_filter = ('value', 'created_at', 'task__lesson__schedule__discipline__group')
     search_fields = ('student__user__last_name',)
+    actions = ['set_grade_5', 'set_grade_4', 'set_grade_3', 'set_grade_2', 'set_grade_1', 'delete_grades']
 
-    def get_add_url_with_data(self, request, obj):
-        return f"{reverse('admin:journal_grade_add')}?value={obj.value}&task={obj.task.id}&student={obj.student.id}"
+    def set_grade_5(self, request, queryset):
+        updated = queryset.update(value=5)
+        self.message_user(request, f'У {updated} оценок установлено значение 5.')
 
-    def get_changeform_initial_data(self, request):
-        return {
-            'value': request.GET.get('value'),
-            'task': request.GET.get('task'),
-            'student': request.GET.get('student'),
-        }
+    set_grade_5.short_description = 'Установить оценку 5'
+
+    def set_grade_4(self, request, queryset):
+        updated = queryset.update(value=4)
+        self.message_user(request, f'У {updated} оценок установлено значение 4.')
+
+    set_grade_4.short_description = 'Установить оценку 4'
+
+    def set_grade_3(self, request, queryset):
+        updated = queryset.update(value=3)
+        self.message_user(request, f'У {updated} оценок установлено значение 3.')
+
+    set_grade_3.short_description = 'Установить оценку 3'
+
+    def set_grade_2(self, request, queryset):
+        updated = queryset.update(value=2)
+        self.message_user(request, f'У {updated} оценок установлено значение 2.')
+
+    set_grade_2.short_description = 'Установить оценку 2'
+
+    def set_grade_1(self, request, queryset):
+        updated = queryset.update(value=1)
+        self.message_user(request, f'У {updated} оценок установлено значение 1.')
+
+    set_grade_1.short_description = 'Установить оценку 1'
+
+    def delete_grades(self, request, queryset):
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f'Удалено {count} оценок.')
+
+    delete_grades.short_description = 'Удалить выбранные оценки'
 
 
 @admin.register(Attendance)
