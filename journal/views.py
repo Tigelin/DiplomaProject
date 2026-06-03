@@ -70,7 +70,19 @@ def discipline_plans_list(request):
 
 def classrooms_list(request):
     classrooms = Classroom.objects.select_related('department').all()
-    return render(request, 'journal/classrooms.html', {'classrooms': classrooms})
+
+    search = request.GET.get('search', '')
+    if search:
+        classrooms = classrooms.filter(
+            Q(number__icontains=search) |
+            Q(department__name__icontains=search)
+        )
+
+    context = {
+        'classrooms': classrooms,
+        'search': search,
+    }
+    return render(request, 'journal/classrooms.html', context)
 
 
 def schedule_list(request):
