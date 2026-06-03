@@ -333,21 +333,46 @@ class AttendanceTypeAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
 
 
 @admin.register(ContactMessage)
-class ContactMessageAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
+class ContactMessageAdmin(admin.ModelAdmin):
     list_display = ('id', 'name', 'email', 'created_at', 'status')
     list_filter = ('status', 'created_at')
     search_fields = ('name', 'email')
+    actions = ['mark_as_new', 'mark_as_processing', 'mark_as_processed', 'mark_as_answered', 'delete_messages']
 
-    def get_add_url_with_data(self, request, obj):
-        return f"{reverse('admin:journal_contactmessage_add')}?name={obj.name}&email={obj.email}&message={obj.message}&status={obj.status.id}"
+    def mark_as_new(self, request, queryset):
+        status, _ = MessageStatus.objects.get_or_create(name='Новое')
+        updated = queryset.update(status=status)
+        self.message_user(request, f'{updated} сообщений отмечено как "Новое".')
 
-    def get_changeform_initial_data(self, request):
-        return {
-            'name': request.GET.get('name'),
-            'email': request.GET.get('email'),
-            'message': request.GET.get('message'),
-            'status': request.GET.get('status'),
-        }
+    mark_as_new.short_description = 'Отметить как "Новое"'
+
+    def mark_as_processing(self, request, queryset):
+        status, _ = MessageStatus.objects.get_or_create(name='В обработке')
+        updated = queryset.update(status=status)
+        self.message_user(request, f'{updated} сообщений отмечено как "В обработке".')
+
+    mark_as_processing.short_description = 'Отметить как "В обработке"'
+
+    def mark_as_processed(self, request, queryset):
+        status, _ = MessageStatus.objects.get_or_create(name='Обработано')
+        updated = queryset.update(status=status)
+        self.message_user(request, f'{updated} сообщений отмечено как "Обработано".')
+
+    mark_as_processed.short_description = 'Отметить как "Обработано"'
+
+    def mark_as_answered(self, request, queryset):
+        status, _ = MessageStatus.objects.get_or_create(name='Отвечено')
+        updated = queryset.update(status=status)
+        self.message_user(request, f'{updated} сообщений отмечено как "Отвечено".')
+
+    mark_as_answered.short_description = 'Отметить как "Отвечено"'
+
+    def delete_messages(self, request, queryset):
+        count = queryset.count()
+        queryset.delete()
+        self.message_user(request, f'Удалено {count} сообщений.')
+
+    delete_messages.short_description = 'Удалить выбранные сообщения'
 
 
 @admin.register(MessageStatus)
