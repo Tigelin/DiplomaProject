@@ -3,7 +3,6 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from journal.models import Grade, Task, Discipline, Lesson, LessonFile, Attendance, Group, Student, Schedule, LessonType, AttendanceType
 import openpyxl
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from django.http import HttpResponse
@@ -13,8 +12,12 @@ from docx import Document
 from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.oxml.ns import qn
-from docx.oxml import OxmlElement
+from django.contrib.admin.views.decorators import staff_member_required
+from journal.models import (
+    Grade, Task, Discipline, Lesson, LessonFile, Attendance,
+    Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
+    Teacher, Classroom
+)
 
 # Create your views here.
 
@@ -932,3 +935,8 @@ def export_journal_docx(request, discipline_id):
     response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
     doc.save(response)
     return response
+
+
+@staff_member_required
+def admin_dashboard(request):
+    return render(request, 'users/admin/dashboard.html')
