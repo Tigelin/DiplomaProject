@@ -20,7 +20,7 @@
         <form method="get" class="mb-4">
             <div class="row g-2">
                 <div class="col-md-8">
-                    <input type="text" name="search" class="form-control" placeholder="Поиск по названию группы, году или отделению..." value="{{ search }}">
+                    <input type="text" name="search" class="form-control" placeholder="Поиск по названию группы, году, специальности или отделению..." value="{{ search }}">
                 </div>
                 <div class="col-md-4">
                     <button type="submit" class="btn btn-primary w-100">
@@ -36,6 +36,7 @@
                     <tr>
                         <th>Номер группы</th>
                         <th>Год поступления</th>
+                        <th>Специальность</th>
                         <th>Отделение</th>
                     </tr>
                 </thead>
@@ -44,11 +45,12 @@
                     <tr>
                         <td>{{ group.name }}</td>
                         <td>{{ group.year }}</td>
-                        <td>{{ group.department.name }}</td>
+                        <td>{{ group.specialty.name }}</td>
+                        <td>{{ group.specialty.department.name }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="text-center">
+                        <td colspan="4" class="text-center">
                             Группы не найдены.
                         </td>
                     </tr>

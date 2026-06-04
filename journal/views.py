@@ -40,14 +40,15 @@ def departments_list(request):
 
 
 def groups_list(request):
-    groups = Group.objects.select_related('department').all()
+    groups = Group.objects.select_related('specialty__department').all()
 
     search = request.GET.get('search', '')
     if search:
         groups = groups.filter(
             Q(name__icontains=search) |
             Q(year__icontains=search) |
-            Q(department__name__icontains=search)
+            Q(specialty__department__name__icontains=search) |
+            Q(specialty__name__icontains=search)
         )
 
     context = {
