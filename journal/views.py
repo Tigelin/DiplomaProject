@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from django.contrib import messages
 from .models import (
     Teacher, Department, Group, Discipline,
-    Classroom, Schedule, ContactMessage, MessageStatus,
+    Specialty, Schedule, ContactMessage, MessageStatus,
     DisciplinePlan
 )
 from django.db.models import Q
@@ -91,21 +91,23 @@ def discipline_plans_list(request):
     return render(request, 'journal/discipline_plans.html', context)
 
 
-def classrooms_list(request):
-    classrooms = Classroom.objects.select_related('department').all()
+def specialties_list(request):
+    specialties = Specialty.objects.select_related('department').all()
 
     search = request.GET.get('search', '')
     if search:
-        classrooms = classrooms.filter(
-            Q(number__icontains=search) |
+        specialties = specialties.filter(
+            Q(name__icontains=search) |
+            Q(code__icontains=search) |
+            Q(qualification__icontains=search) |
             Q(department__name__icontains=search)
         )
 
     context = {
-        'classrooms': classrooms,
+        'specialties': specialties,
         'search': search,
     }
-    return render(request, 'journal/classrooms.html', context)
+    return render(request, 'journal/specialties.html', context)
 
 
 def schedule_list(request):

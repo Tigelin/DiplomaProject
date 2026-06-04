@@ -29,6 +29,11 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'specialties_list' %}active{% endif %}" href="{% url 'specialties_list' %}">
+                        <i class="bi bi-mortarboard"></i> Специальности
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'groups_list' %}active{% endif %}" href="{% url 'groups_list' %}">
                         <i class="bi bi-people"></i> Группы
                     </a>
@@ -41,11 +46,6 @@
                 <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'discipline_plans_list' %}active{% endif %}" href="{% url 'discipline_plans_list' %}">
                         <i class="bi bi-journal-bookmark"></i> Планы
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'classrooms_list' %}active{% endif %}" href="{% url 'classrooms_list' %}">
-                        <i class="bi bi-door-closed"></i> Кабинеты
                     </a>
                 </li>
                 <li class="nav-item">

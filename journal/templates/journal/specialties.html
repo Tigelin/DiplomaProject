@@ -1,0 +1,68 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Специальности{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item active">Специальности</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0"><i class="bi bi-mortarboard"></i> Специальности колледжа</h4>
+    </div>
+    <div class="card-body">
+
+        <form method="get" class="mb-4">
+            <div class="row g-2">
+                <div class="col-md-8">
+                    <input type="text" name="search" class="form-control" placeholder="Поиск по названию, коду, квалификации или отделению..." value="{{ search }}">
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Искать
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <div class="row">
+            {% for specialty in specialties %}
+            <div class="col-md-6 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ specialty.name }}</h5>
+                        <p class="card-text">
+                            <strong>Код:</strong> {{ specialty.code|default:"—" }}<br>
+                            <strong>Квалификация:</strong> {{ specialty.qualification|default:"—" }}<br>
+                            <strong>Отделение:</strong> {{ specialty.department.name }}
+                        </p>
+                        {% if specialty.description %}
+                        <p class="card-text">
+                            <small class="text-muted">{{ specialty.description|truncatewords:20 }}</small>
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-info-circle"></i> Специальности не найдены.
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <a href="{% url 'home' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> На главную
+        </a>
+
+    </div>
+</div>
+
+{% endblock %}
