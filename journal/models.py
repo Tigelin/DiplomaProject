@@ -17,10 +17,23 @@ class Department(models.Model):
         verbose_name_plural = "Отделения"
 
 
+class Specialty(models.Model):
+    name = models.CharField(max_length=200, verbose_name="Название специальности")
+    code = models.CharField(max_length=20, verbose_name="Код специальности", blank=True)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, verbose_name="Отделение")
+
+    def __str__(self):
+        return f"{self.name} ({self.code})" if self.code else self.name
+
+    class Meta:
+        verbose_name = "Специальность"
+        verbose_name_plural = "Специальности"
+
+
 class Group(models.Model):
     name = models.CharField(max_length=50, verbose_name="Номер группы")
     year = models.IntegerField(verbose_name="Год поступления")
-    department = models.ForeignKey(Department, on_delete=models.CASCADE, verbose_name="Отделение")
+    specialty = models.ForeignKey(Specialty, on_delete=models.CASCADE, verbose_name="Специальность")
 
     def __str__(self):
         return f"{self.name} ({self.year})"

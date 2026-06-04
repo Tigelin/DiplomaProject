@@ -4,7 +4,8 @@ from django.urls import reverse
 from .models import (
     Department, Group, Teacher, Student, DisciplinePlan, Discipline,
     Classroom, Schedule, Lesson, LessonType, Task, LessonFile,
-    Grade, Attendance, AttendanceType, ContactMessage, MessageStatus
+    Grade, Attendance, AttendanceType, ContactMessage, MessageStatus,
+    Specialty
 )
 
 
@@ -49,18 +50,22 @@ class DepartmentAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
 
 @admin.register(Group)
 class GroupAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
-    list_display = ('id', 'name', 'year', 'department')
-    list_filter = ('year', 'department')
+    list_display = ('id', 'name', 'year', 'specialty', 'get_department')
+    list_filter = ('year', 'specialty')
     search_fields = ('name',)
 
+    def get_department(self, obj):
+        return obj.specialty.department.name
+    get_department.short_description = 'Отделение'
+
     def get_add_url_with_data(self, request, obj):
-        return f"{reverse('admin:journal_group_add')}?name={obj.name}&year={obj.year}&department={obj.department.id}"
+        return f"{reverse('admin:journal_group_add')}?name={obj.name}&year={obj.year}&specialty={obj.specialty.id}"
 
     def get_changeform_initial_data(self, request):
         return {
             'name': request.GET.get('name'),
             'year': request.GET.get('year'),
-            'department': request.GET.get('department'),
+            'specialty': request.GET.get('specialty'),
         }
 
 
@@ -387,3 +392,10 @@ class MessageStatusAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
         return {
             'name': request.GET.get('name'),
         }
+
+
+@admin.register(Specialty)
+class SpecialtyAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'code', 'department')
+    list_filter = ('department',)
+    search_fields = ('name', 'code')
