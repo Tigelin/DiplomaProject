@@ -395,7 +395,7 @@ class MessageStatusAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
 
 
 @admin.register(Specialty)
-class SpecialtyAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'code', 'department')
+class SpecialtyAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
+    list_display = ('id', 'name', 'code', 'qualification', 'department')
     list_filter = ('department',)
-    search_fields = ('name', 'code')
+    search_fields = ('name', 'code', 'qualification')

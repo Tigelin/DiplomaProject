@@ -20,6 +20,8 @@ class Department(models.Model):
 class Specialty(models.Model):
     name = models.CharField(max_length=200, verbose_name="Название специальности")
     code = models.CharField(max_length=20, verbose_name="Код специальности", blank=True)
+    qualification = models.CharField(max_length=200, verbose_name="Квалификация", blank=True)
+    description = models.TextField(verbose_name="Описание", blank=True)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, verbose_name="Отделение")
 
     def __str__(self):
