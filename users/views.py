@@ -259,55 +259,59 @@ def student_attendance(request):
         messages.error(request, 'Профиль студента не найден.')
         return redirect('home')
 
-    attendances = Attendance.objects.filter(student=student).select_related(
-        'lesson__schedule__discipline__plan',
-        'lesson__schedule',
-        'attendance_type'
-    ).order_by('lesson__schedule__date', 'lesson__schedule__lesson_number')
+    lessons = Lesson.objects.filter(
+        schedule__discipline__group=student.group
+    ).select_related(
+        'schedule__discipline__plan',
+        'schedule'
+    ).order_by('schedule__date', 'schedule__lesson_number')
+
+    attendances = {att.lesson_id: att for att in Attendance.objects.filter(student=student)}
 
     disciplines_dict = {}
-    for att in attendances:
-        discipline_name = att.lesson.schedule.discipline.plan.name
-        discipline_id = att.lesson.schedule.discipline.id
+    for lesson in lessons:
+        discipline_name = lesson.schedule.discipline.plan.name
+        discipline_id = lesson.schedule.discipline.id
         if discipline_id not in disciplines_dict:
             disciplines_dict[discipline_id] = discipline_name
 
-    lessons_dict = {}
-    for att in attendances:
-        lesson_id = att.lesson.id
-        lesson_date = att.lesson.schedule.date
-        lesson_number = att.lesson.schedule.lesson_number
-        if lesson_id not in lessons_dict:
-            lessons_dict[lesson_id] = {
-                'date': lesson_date,
-                'lesson_number': lesson_number,
-                'discipline_id': att.lesson.schedule.discipline.id
-            }
-
-    sorted_lessons = sorted(lessons_dict.values(), key=lambda x: (x['date'], x['lesson_number']))
+    lessons_list = []
+    for lesson in lessons:
+        lessons_list.append({
+            'id': lesson.id,
+            'date': lesson.schedule.date,
+            'lesson_number': lesson.schedule.lesson_number,
+            'discipline_id': lesson.schedule.discipline.id,
+        })
 
     matrix = {}
     for discipline_id in disciplines_dict:
         matrix[discipline_id] = {}
-        for lesson in sorted_lessons:
+        for lesson in lessons_list:
             matrix[discipline_id][lesson['date']] = matrix[discipline_id].get(lesson['date'], {})
             matrix[discipline_id][lesson['date']][lesson['lesson_number']] = None
 
-    for att in attendances:
-        discipline_id = att.lesson.schedule.discipline.id
-        date = att.lesson.schedule.date
-        lesson_number = att.lesson.schedule.lesson_number
-        matrix[discipline_id][date][lesson_number] = att.attendance_type.name
+    for lesson in lessons:
+        discipline_id = lesson.schedule.discipline.id
+        date = lesson.schedule.date
+        lesson_number = lesson.schedule.lesson_number
+        attendance = attendances.get(lesson.id)
+        if attendance:
+            matrix[discipline_id][date][lesson_number] = attendance.attendance_type.name
+        else:
+            matrix[discipline_id][date][lesson_number] = 'Присутствовал'
 
-    total = attendances.count()
-    present = attendances.filter(attendance_type__name='Присутствовал').count()
+    total = len(lessons)
+    present = sum(1 for att in attendances.values() if att.attendance_type.name == 'Присутствовал')
+
+    present += (total - len(attendances))
     absent = total - present
     attendance_percent = round((present / total * 100) if total > 0 else 0)
 
     context = {
         'student': student,
         'disciplines': disciplines_dict.items(),
-        'lessons': sorted_lessons,
+        'lessons': lessons_list,
         'matrix': matrix,
         'total': total,
         'present': present,

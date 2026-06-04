@@ -97,29 +97,25 @@
 
                                         {% with matrix|get_by_key:discipline_id|get_by_key:lesson.date|get_by_key:lesson.lesson_number as status %}
 
-                                            {% if status %}
+                                            {% if status == 'Присутствовал' %}
 
-                                                {% if status == 'Присутствовал' %}
+                                                <span class="text-success fw-bold">✓</span>
 
-                                                    <span class="text-success fw-bold">✓</span>
+                                            {% elif status == 'Опоздал' %}
 
-                                                {% elif status == 'Опоздал' %}
+                                                <span class="text-warning fw-bold">О</span>
 
-                                                    <span class="text-warning fw-bold">О</span>
+                                            {% elif status == 'Отсутствовал по болезни' %}
 
-                                                {% elif status == 'Отсутствовал по болезни' %}
+                                                <span class="text-primary fw-bold">Б</span>
 
-                                                    <span class="text-primary fw-bold">Б</span>
+                                            {% elif status == 'Отсутствовал по уважительной причине' %}
 
-                                                {% elif status == 'Отсутствовал по уважительной причине' %}
+                                                <span class="text-orange fw-bold">УП</span>
 
-                                                    <span class="text-orange fw-bold">УП</span>
+                                            {% elif status == 'Отсутствовал без причины' %}
 
-                                                {% elif status == 'Отсутствовал без причины' %}
-
-                                                    <span class="text-danger fw-bold">НП</span>
-
-                                                {% endif %}
+                                                <span class="text-danger fw-bold">НП</span>
 
                                             {% else %}
 
