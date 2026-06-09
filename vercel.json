@@ -1,5 +1,5 @@
 {
-  "buildCommand": "bash build_files.sh",
+  "buildCommand": "python manage.py collectstatic --noinput && mkdir -p staticfiles",
   "installCommand": "pip install -r requirements.txt",
   "builds": [
     {
@@ -15,10 +15,6 @@
     {
       "src": "/static/(.*)",
       "dest": "/static/$1"
-    },
-    {
-      "src": "/media/(.*)",
-      "dest": "/media/$1"
     },
     {
       "src": "/(.*)",
