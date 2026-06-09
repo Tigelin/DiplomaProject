@@ -6,13 +6,15 @@ pip install -r requirements.txt
 
 echo "=== Creating static directories ==="
 mkdir -p staticfiles
-mkdir -p /tmp/staticfiles
 
 echo "=== Collecting static files ==="
-python manage.py collectstatic --noinput --clear
+python manage.py collectstatic --noinput -v 2
 
-echo "=== Copying static to multiple locations ==="
-cp -r staticfiles/* /tmp/staticfiles/ 2>/dev/null || true
-ls -la staticfiles/
+echo "=== Checking static files ==="
+echo "Files in staticfiles:"
+find staticfiles -type f | head -20
+
+echo "=== Admin static files ==="
+ls -la staticfiles/admin/css/ 2>/dev/null || echo "No admin CSS found"
 
 echo "=== Build completed ==="

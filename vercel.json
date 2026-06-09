@@ -1,24 +1,25 @@
 {
   "buildCommand": "bash build_files.sh",
-  "outputDirectory": ".",
+  "installCommand": "pip install -r requirements.txt",
   "builds": [
     {
       "src": "core/wsgi.py",
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "50mb",
-        "runtime": "python3.12"
+        "runtime": "python3.12",
+        "includeFiles": "staticfiles/**"
       }
     }
   ],
   "routes": [
     {
       "src": "/static/(.*)",
-      "dest": "/static/$1"
+      "dest": "/core/wsgi.py"
     },
     {
       "src": "/(.*)",
-      "dest": "core/wsgi.py"
+      "dest": "/core/wsgi.py"
     }
   ]
 }
