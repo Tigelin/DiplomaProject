@@ -256,7 +256,7 @@ python manage.py runserver
 
 ## 🌐 Ссылка на работающий проект
 
-Демо-версия развернута и доступна на хостинге Vercel:
+Сайт развернут и доступен на хостинге Vercel:
 🔗 **[diploma-project-n797wrbst-tigelin-s-projects.vercel.app](https://diploma-project-n797wrbst-tigelin-s-projects.vercel.app)**
 
 ---
