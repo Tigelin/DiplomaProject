@@ -1,4 +1,6 @@
 {
+  "buildCommand": "bash build_files.sh",
+  "installCommand": "pip install -r requirements.txt",
   "builds": [
     {
       "src": "core/wsgi.py",
@@ -10,6 +12,14 @@
     }
   ],
   "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/media/(.*)",
+      "dest": "/media/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "core/wsgi.py"
