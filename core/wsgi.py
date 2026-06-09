@@ -1,15 +1,18 @@
 import os
 from django.core.wsgi import get_wsgi_application
+from whitenoise import WhiteNoise
+from django.conf import settings
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 
 application = get_wsgi_application()
 
-from whitenoise import WhiteNoise
-
 application = WhiteNoise(
     application,
-    root=os.path.join(os.path.dirname(os.path.dirname(__file__)), 'staticfiles'),
-    prefix='static/',
-    max_age=31536000
+    root=settings.STATIC_ROOT,
+    prefix='static/'
 )
+
+if settings.STATICFILES_DIRS:
+    for static_dir in settings.STATICFILES_DIRS:
+        application.add_files(static_dir, prefix='static/')
