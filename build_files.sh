@@ -1,9 +1,18 @@
 #!/bin/bash
-echo "Installing dependencies..."
+set -e
+
+echo "=== Installing dependencies ==="
 pip install -r requirements.txt
 
-echo "Collecting static files..."
+echo "=== Creating static directories ==="
+mkdir -p staticfiles
+mkdir -p /tmp/staticfiles
+
+echo "=== Collecting static files ==="
 python manage.py collectstatic --noinput --clear
 
-echo "Build completed!"
+echo "=== Copying static to multiple locations ==="
+cp -r staticfiles/* /tmp/staticfiles/ 2>/dev/null || true
 ls -la staticfiles/
+
+echo "=== Build completed ==="
