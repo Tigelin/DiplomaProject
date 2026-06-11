@@ -71,13 +71,9 @@ pip install -r requirements.txt
 Создайте файл `.env` в корневой директории проекта по образцу `.env.example` и заполните его своими данными:
 
 ```env
-DB_NAME=diploma_database
-DB_USER=journal_user
-DB_PASSWORD=12345678
-DB_HOST=localhost
-DB_PORT=5432
+DEBUG=True
 SECRET_KEY=your_secret_key_here
-
+DATABASE_URL=postgresql://journal_user:12345678@localhost:5432/mydb2
 ```
 
 ### 5. Настройка базы данных PostgreSQL
