@@ -253,7 +253,7 @@ python manage.py runserver
 ## 🌐 Ссылка на работающий проект
 
 Сайт развернут и доступен на хостинге Vercel:
-🔗 **[diploma-project-n797wrbst-tigelin-s-projects.vercel.app](https://diploma-project-n797wrbst-tigelin-s-projects.vercel.app)**
+🔗 **[diploma-project-tigelin-s-projects.vercel.app/](https://diploma-project-tigelin-s-projects.vercel.app/)**
 
 ---
 
