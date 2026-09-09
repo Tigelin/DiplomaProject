@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'storages',
     'users',
     'journal',
 ]
@@ -148,6 +149,29 @@ WHITENOISE_AUTOREFRESH = True if DEBUG else False
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+if os.getenv('AWS_STORAGE_BUCKET_NAME'):
+    STORAGES = {
+        'default': {
+            'BACKEND': 'storages.backends.s3.S3Storage',
+            'OPTIONS': {
+                'endpoint_url': os.getenv('AWS_S3_ENDPOINT_URL'),
+                'bucket_name': os.getenv('AWS_STORAGE_BUCKET_NAME'),
+                'region_name': os.getenv('AWS_S3_REGION_NAME'),
+                'access_key': os.getenv('AWS_S3_ACCESS_KEY_ID'),
+                'secret_key': os.getenv('AWS_S3_SECRET_ACCESS_KEY'),
+                'default_acl': None,
+                'querystring_auth': True,
+                'querystring_expire': 300,
+                'file_overwrite': False,
+            },
+        },
+        'staticfiles': {
+            'BACKEND': (
+                'django.contrib.staticfiles.storage.StaticFilesStorage'
+            ),
+        },
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
