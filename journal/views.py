@@ -119,20 +119,31 @@ def schedule_list(request):
         selected_group = get_object_or_404(Group, id=group_id)
 
     week_offset = int(request.GET.get('week_offset', 0))
+    selected_date = request.GET.get('date', '')
 
     week_days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 
-    today = timezone.now().date()
-    target_date = today + timedelta(weeks=week_offset)
+    today = timezone.localdate()
+    target_date = today
+
+    if selected_date:
+        try:
+            target_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = ''
+
+    target_date += timedelta(weeks=week_offset)
     monday = target_date - timedelta(days=target_date.weekday())
     week_dates = [monday + timedelta(days=i) for i in range(7)]
 
+    current_monday = today - timedelta(days=today.weekday())
+    is_current_week = monday == current_monday
+
     today_index = -1
-    if week_offset == 0:
-        for i, date in enumerate(week_dates):
-            if date == today:
-                today_index = i
-                break
+    for i, date in enumerate(week_dates):
+        if date == today:
+            today_index = i
+            break
 
     week_range = f"{monday.strftime('%d.%m.%Y')} — {(monday + timedelta(days=6)).strftime('%d.%m.%Y')}"
     week_schedule = [(week_days[i], week_dates[i]) for i in range(7)]
@@ -167,6 +178,8 @@ def schedule_list(request):
         'today_index': today_index,
         'week_offset': week_offset,
         'week_range': week_range,
+        'selected_date': selected_date,
+        'is_current_week': is_current_week,
     }
     return render(request, 'journal/schedule.html', context)
 

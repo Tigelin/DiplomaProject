@@ -31,6 +31,15 @@
                     {% endfor %}
                 </select>
             </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Выберите дату:</label>
+                <input type="date"
+                       name="date"
+                       class="form-control"
+                       value="{{ selected_date }}">
+            </div>
+
             <div class="col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-eye"></i> Показать
@@ -41,23 +50,27 @@
         {% if selected_group %}
 
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <a href="?group_id={{ selected_group.id }}&week_offset={{ week_offset|add:-1 }}" class="btn btn-outline-secondary">
+                <a href="?group_id={{ selected_group.id }}&date={{ selected_date }}&week_offset={{ week_offset|add:-1 }}"
+                   class="btn btn-outline-secondary">
                     <i class="bi bi-chevron-left"></i> Предыдущая неделя
                 </a>
+
                 <div class="text-center">
                     <strong>{{ week_range }}</strong>
-                    {% if week_offset == 0 %}
+                    {% if is_current_week %}
                         <span class="badge bg-success ms-2">Текущая неделя</span>
                     {% endif %}
                 </div>
-                <a href="?group_id={{ selected_group.id }}&week_offset={{ week_offset|add:1 }}" class="btn btn-outline-secondary">
+
+                <a href="?group_id={{ selected_group.id }}&date={{ selected_date }}&week_offset={{ week_offset|add:1 }}"
+                   class="btn btn-outline-secondary">
                     Следующая неделя <i class="bi bi-chevron-right"></i>
                 </a>
             </div>
 
-            {% if week_offset != 0 %}
+            {% if selected_date or week_offset != 0 %}
                 <div class="text-center mb-3">
-                    <a href="?group_id={{ selected_group.id }}&week_offset=0" class="btn btn-sm btn-primary">
+                    <a href="?group_id={{ selected_group.id }}" class="btn btn-sm btn-primary">
                         <i class="bi bi-calendar-week"></i> Вернуться к текущей неделе
                     </a>
                 </div>
