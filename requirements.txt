@@ -1,6 +1,7 @@
 asgiref==3.10.0
 dj-database-url==3.1.2
 Django==5.2.8
+django-storages[s3]==1.14.6
 django-environ==0.13.0
 et_xmlfile==2.0.0
 gunicorn==26.0.0

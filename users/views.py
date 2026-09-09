@@ -19,6 +19,7 @@ from journal.models import (
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
     Teacher, Classroom
 )
+from .forms import LessonFileUploadForm
 
 # Create your views here.
 
@@ -468,6 +469,7 @@ def teacher_lesson(request, schedule_id):
         return redirect('teacher_groups')
 
     lesson = Lesson.objects.filter(schedule=schedule).first()
+    upload_form = LessonFileUploadForm()
 
     if request.method == 'POST':
         if 'save_lesson' in request.POST:
@@ -501,16 +503,25 @@ def teacher_lesson(request, schedule_id):
             return redirect('teacher_lesson', schedule_id=schedule.id)
 
         elif 'upload_file' in request.POST:
-            if lesson and request.FILES.get('file'):
+            if not lesson:
+                messages.error(request, 'Сначала сохраните занятие.')
+                return redirect('teacher_lesson', schedule_id=schedule.id)
+
+            upload_form = LessonFileUploadForm(
+                request.POST,
+                request.FILES
+            )
+
+            if upload_form.is_valid():
                 LessonFile.objects.create(
-                    name=request.POST.get('file_name', request.FILES['file'].name),
+                    name=upload_form.cleaned_data['file_name'],
                     lesson=lesson,
-                    file=request.FILES['file']
+                    file=upload_form.cleaned_data['file']
                 )
                 messages.success(request, 'Файл загружен.')
-            else:
-                messages.error(request, 'Сначала сохраните занятие.')
-            return redirect('teacher_lesson', schedule_id=schedule.id)
+                return redirect('teacher_lesson', schedule_id=schedule.id)
+
+            messages.error(request, 'Не удалось загрузить файл.')
 
     created = lesson is None
 
@@ -526,6 +537,7 @@ def teacher_lesson(request, schedule_id):
         'lesson_types': lesson_types,
         'files': files,
         'tasks': tasks,
+        'upload_form': upload_form,
     }
     return render(request, 'users/teacher/lesson.html', context)
 
