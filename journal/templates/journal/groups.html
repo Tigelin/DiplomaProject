@@ -59,6 +59,61 @@
             </table>
         </div>
 
+                {% if groups.has_other_pages %}
+
+        <nav aria-label="Навигация по страницам групп" class="mt-3">
+            <ul class="pagination justify-content-center">
+
+                {% if groups.has_previous %}
+
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ groups.previous_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                        Назад
+                    </a>
+                </li>
+
+                {% endif %}
+
+                {% for page_number in page_range %}
+
+                    {% if page_number == ellipsis %}
+
+                    <li class="page-item disabled">
+                        <span class="page-link">{{ page_number }}</span>
+                    </li>
+
+                    {% elif page_number == groups.number %}
+
+                    <li class="page-item active" aria-current="page">
+                        <span class="page-link">{{ page_number }}</span>
+                    </li>
+
+                    {% else %}
+
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                            {{ page_number }}
+                        </a>
+                    </li>
+
+                    {% endif %}
+
+                {% endfor %}
+
+                {% if groups.has_next %}
+
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ groups.next_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                        Вперёд
+                    </a>
+                </li>
+
+                {% endif %}
+            </ul>
+        </nav>
+
+        {% endif %}
+
         <a href="{% url 'home' %}" class="btn btn-secondary mt-3">
             <i class="bi bi-arrow-left"></i> На главную
         </a>
