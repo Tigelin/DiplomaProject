@@ -117,9 +117,20 @@ def discipline_plans_list(request):
     if search:
         plans = plans.filter(name__icontains=search)
 
+    paginator = Paginator(plans, 15)
+    page_number = request.GET.get('page')
+    plans = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        plans.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'plans': plans,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/discipline_plans.html', context)
 
