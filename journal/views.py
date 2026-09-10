@@ -108,7 +108,10 @@ def discipline_plans_list(request):
 
 
 def specialties_list(request):
-    specialties = Specialty.objects.select_related('department').all()
+    specialties = Specialty.objects.select_related('department').order_by(
+        'name',
+        'code',
+    )
 
     search = request.GET.get('search', '')
     if search:
@@ -119,9 +122,20 @@ def specialties_list(request):
             Q(department__name__icontains=search)
         )
 
+    paginator = Paginator(specialties, 6)
+    page_number = request.GET.get('page')
+    specialties = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        specialties.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'specialties': specialties,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/specialties.html', context)
 
