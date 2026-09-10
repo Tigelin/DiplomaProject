@@ -92,7 +92,14 @@ def groups_list(request):
 
 
 def disciplines_list(request):
-    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').all()
+    disciplines = Discipline.objects.select_related(
+        'plan',
+        'group',
+        'teacher__user',
+    ).order_by(
+        'plan__name',
+        'group__name',
+    )
 
     search = request.GET.get('search', '')
     if search:
@@ -103,9 +110,20 @@ def disciplines_list(request):
             Q(teacher__user__first_name__icontains=search)
         )
 
+    paginator = Paginator(disciplines, 15)
+    page_number = request.GET.get('page')
+    disciplines = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        disciplines.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'disciplines': disciplines,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/disciplines.html', context)
 
