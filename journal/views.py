@@ -11,13 +11,18 @@ from .models import (
     DisciplinePlan
 )
 from django.db.models import Q
+from django.core.paginator import Paginator
 
 def home(request):
     return render(request, 'journal/home.html')
 
 
 def teachers_list(request):
-    teachers = Teacher.objects.select_related('user').all()
+    teachers = Teacher.objects.select_related('user').order_by(
+        'user__last_name',
+        'user__first_name',
+        'user__patronymic',
+    )
 
     search = request.GET.get('search', '')
     if search:
@@ -27,9 +32,20 @@ def teachers_list(request):
             Q(user__patronymic__icontains=search)
         )
 
+    paginator = Paginator(teachers, 12)
+    page_number = request.GET.get('page')
+    teachers = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        teachers.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'teachers': teachers,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/teachers.html', context)
 
