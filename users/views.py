@@ -13,7 +13,7 @@ from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Q
+from django.db.models import Q, Sum
 from journal.models import (
     Grade, Task, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
@@ -358,25 +358,42 @@ def teacher_groups(request):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    groups = Group.objects.filter(
-        discipline__teacher=teacher
-    ).distinct()
+    disciplines = Discipline.objects.filter(
+        teacher=teacher
+    ).select_related(
+        'plan',
+        'group__specialty',
+    ).annotate(
+        actual_hours=Sum('schedule__lesson__hours')
+    ).order_by(
+        '-group__year',
+        'group__name',
+        'plan__name',
+    )
 
-    for group in groups:
-        disciplines = Discipline.objects.filter(group=group, teacher=teacher)
-        group.disciplines = disciplines
-        for discipline in disciplines:
-            total_hours = 0
-            lessons = Lesson.objects.filter(
-                schedule__discipline=discipline
-            )
-            for lesson in lessons:
-                total_hours += lesson.hours
-            discipline.actual_hours = total_hours
+    search = request.GET.get('search', '')
+    if search:
+        disciplines = disciplines.filter(
+            Q(plan__name__icontains=search) |
+            Q(group__name__icontains=search) |
+            Q(group__specialty__name__icontains=search)
+        )
+
+    paginator = Paginator(disciplines, 15)
+    page_number = request.GET.get('page')
+    disciplines = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        disciplines.number,
+        on_each_side=2,
+        on_ends=1,
+    )
 
     context = {
         'teacher': teacher,
-        'groups': groups,
+        'disciplines': disciplines,
+        'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/teacher/groups.html', context)
 
