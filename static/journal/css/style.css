@@ -44,3 +44,7 @@
 .journal-table tbody tr > :first-child {
     background-color: #f8f9fa;
 }
+
+.journal-table .lesson-start {
+    border-left: 2px solid #6c757d !important;
+}

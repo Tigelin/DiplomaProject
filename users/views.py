@@ -448,12 +448,34 @@ def teacher_journal(request, discipline_id):
         if student_id in grades_matrix and task_id in grades_matrix[student_id]:
             grades_matrix[student_id][task_id] = grade.value
 
+    attendance_matrix = {}
+    for student in students:
+        attendance_matrix[student.id] = {}
+        for schedule in schedules:
+            if schedule.has_lesson:
+                attendance_matrix[student.id][schedule.lesson.id] = 'Присутствовал'
+
+    attendances = Attendance.objects.filter(
+        lesson__schedule__discipline=discipline
+    ).select_related('student', 'lesson', 'attendance_type')
+
+    for attendance in attendances:
+        student_id = attendance.student.id
+        lesson_id = attendance.lesson.id
+
+        if student_id in attendance_matrix and lesson_id in attendance_matrix[student_id]:
+            if attendance.attendance_type:
+                attendance_matrix[student_id][lesson_id] = attendance.attendance_type.name
+            else:
+                attendance_matrix[student_id][lesson_id] = '—'
+
     context = {
         'teacher': teacher,
         'discipline': discipline,
         'students': students,
         'schedules': schedules,
         'grades_matrix': grades_matrix,
+        'attendance_matrix': attendance_matrix,
     }
     return render(request, 'users/teacher/journal.html', context)
 
