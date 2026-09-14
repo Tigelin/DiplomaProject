@@ -31,7 +31,7 @@
             
             <div class="mb-3">
                 <label class="form-label">Дисциплина</label>
-                <select name="discipline_id" class="form-select" required>
+                <select name="discipline_id" class="form-select" required {% if has_lesson %}disabled{% endif %}>
                     <option value="">-- Выберите --</option>
                     {% for discipline in disciplines %}
                         <option value="{{ discipline.id }}" {% if schedule.discipline.id == discipline.id %}selected{% endif %}>
@@ -39,6 +39,11 @@
                         </option>
                     {% endfor %}
                 </select>
+                {% if has_lesson %}
+                    <div class="form-text">
+                        Дисциплину нельзя изменить, так как занятие уже проведено.
+                    </div>
+                {% endif %}
             </div>
             
             <div class="mb-3">

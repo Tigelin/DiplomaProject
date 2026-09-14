@@ -1053,13 +1053,23 @@ def admin_schedule_create(request):
 @staff_member_required
 def admin_schedule_edit(request, schedule_id):
     schedule = get_object_or_404(Schedule, id=schedule_id)
+    has_lesson = Lesson.objects.filter(schedule=schedule).exists()
     return_url = (
         f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}"
         f"&date={schedule.date.strftime('%Y-%m-%d')}&manage=1"
     )
 
     if request.method == 'POST':
-        discipline_id = request.POST.get('discipline_id')
+        if has_lesson:
+            discipline_id = schedule.discipline_id
+        else:
+            discipline = get_object_or_404(
+                Discipline,
+                id=request.POST.get('discipline_id'),
+                group=schedule.discipline.group
+            )
+            discipline_id = discipline.id
+
         classroom_id = request.POST.get('classroom_id')
         date = request.POST.get('date')
         lesson_number = request.POST.get('lesson_number')
@@ -1068,24 +1078,26 @@ def admin_schedule_edit(request, schedule_id):
             lesson_number = int(lesson_number)
             if lesson_number < 1 or lesson_number > 7:
                 messages.error(request, 'Номер пары должен быть от 1 до 7.')
-                disciplines = Discipline.objects.select_related('plan', 'group').all()
+                disciplines = Discipline.objects.select_related('plan', 'group').filter(group=schedule.discipline.group)
                 classrooms = Classroom.objects.all()
                 context = {
                     'schedule': schedule,
                     'disciplines': disciplines,
                     'classrooms': classrooms,
                     'return_url': return_url,
+                    'has_lesson': has_lesson,
                 }
                 return render(request, 'users/admin/schedule_form.html', context)
         except (ValueError, TypeError):
             messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
-            disciplines = Discipline.objects.select_related('plan', 'group').all()
+            disciplines = Discipline.objects.select_related('plan', 'group').filter(group=schedule.discipline.group)
             classrooms = Classroom.objects.all()
             context = {
                 'schedule': schedule,
                 'disciplines': disciplines,
                 'classrooms': classrooms,
                 'return_url': return_url,
+                'has_lesson': has_lesson,
             }
             return render(request, 'users/admin/schedule_form.html', context)
 
@@ -1099,7 +1111,7 @@ def admin_schedule_edit(request, schedule_id):
             f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
         )
 
-    disciplines = Discipline.objects.select_related('plan', 'group').all()
+    disciplines = Discipline.objects.select_related('plan', 'group').filter(group=schedule.discipline.group)
     classrooms = Classroom.objects.all()
 
     context = {
@@ -1107,6 +1119,7 @@ def admin_schedule_edit(request, schedule_id):
         'disciplines': disciplines,
         'classrooms': classrooms,
         'return_url': return_url,
+        'has_lesson': has_lesson,
     }
     return render(request, 'users/admin/schedule_form.html', context)
 
