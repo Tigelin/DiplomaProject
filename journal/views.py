@@ -244,6 +244,8 @@ def schedule_list(request):
                 schedule_grid[weekday] = {}
             schedule_grid[weekday][s.lesson_number] = s
 
+    manage_mode = request.GET.get('manage') == '1' and request.user.is_staff
+
     context = {
         'groups': groups,
         'selected_group': selected_group,
@@ -256,6 +258,10 @@ def schedule_list(request):
         'week_range': week_range,
         'selected_date': selected_date,
         'is_current_week': is_current_week,
+        'manage_mode': manage_mode,
+        'week_dates_by_index': {
+            i: date for i, date in enumerate(week_dates)
+        },
     }
     return render(request, 'journal/schedule.html', context)
 

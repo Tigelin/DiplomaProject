@@ -8,7 +8,7 @@
 
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
     <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
-    <li class="breadcrumb-item"><a href="{% url 'admin_schedules' %}">Расписание</a></li>
+    <li class="breadcrumb-item"><a href="{{ return_url }}">Расписание</a></li>
     <li class="breadcrumb-item active">
         {% if schedule %}Редактирование{% else %}Добавление{% endif %}
     </li>
@@ -55,22 +55,48 @@
             
             <div class="mb-3">
                 <label class="form-label">Дата</label>
-                <input type="date" name="date" class="form-control" value="{{ schedule.date|date:'Y-m-d' }}" required>
+                <input type="date"
+                   name="date"
+                   class="form-control"
+                   value="{% if schedule %}{{ schedule.date|date:'Y-m-d' }}{% else %}{{ initial_date }}{% endif %}"
+                   required
+                >
             </div>
             
             <div class="mb-3">
                 <label class="form-label">Номер пары</label>
-                <input type="number" name="lesson_number" class="form-control" value="{{ schedule.lesson_number }}" min="1" max="7" required>
+                <input type="number"
+                   name="lesson_number"
+                   class="form-control"
+                   value="{% if schedule %}{{ schedule.lesson_number }}{% else %}{{ initial_lesson_number }}{% endif %}"
+                   min="1"
+                   max="7"
+                   required
+                >
             </div>
             
             <button type="submit" class="btn btn-primary">
                 <i class="bi bi-save"></i> Сохранить
             </button>
             
-            <a href="{% url 'admin_schedules' %}" class="btn btn-secondary">
+            <a href="{{ return_url }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Отмена
             </a>
         </form>
+
+        {% if schedule %}
+            <hr>
+
+            <form method="post"
+                  action="{% url 'admin_schedule_delete' schedule.id %}"
+                  onsubmit="return confirm('Удалить эту запись расписания?')">
+                {% csrf_token %}
+
+                <button type="submit" class="btn btn-outline-danger">
+                    <i class="bi bi-trash"></i> Удалить
+                </button>
+            </form>
+        {% endif %}
         
     </div>
 </div>
