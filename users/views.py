@@ -992,23 +992,67 @@ def admin_schedules(request):
     return redirect(f"{reverse('schedule_list')}?manage=1")
 
 
+def get_schedule_conflicts(
+    discipline,
+    classroom,
+    date,
+    lesson_number,
+    exclude_schedule_id=None
+):
+    schedules = Schedule.objects.filter(
+        date=date,
+        lesson_number=lesson_number
+    ).select_related(
+        'discipline__plan',
+        'discipline__group',
+        'discipline__teacher__user',
+        'classroom'
+    )
+
+    if exclude_schedule_id:
+        schedules = schedules.exclude(id=exclude_schedule_id)
+
+    classroom_conflicts = schedules.filter(classroom=classroom)
+    teacher_conflicts = schedules.filter(
+        discipline__teacher=discipline.teacher
+    )
+
+    return classroom_conflicts, teacher_conflicts
+
+
 @staff_member_required
 def admin_schedule_create(request):
     group_id = request.GET.get('group_id')
+
+    if not group_id:
+        messages.error(
+            request,
+            'Сначала выберите группу в расписании.'
+        )
+        return redirect(
+            f"{reverse('schedule_list')}?manage=1"
+        )
+
     initial_date = request.GET.get('date', '')
     initial_lesson_number = request.GET.get('lesson_number', '')
 
-    disciplines = Discipline.objects.select_related('plan', 'group').all()
-    classrooms = Classroom.objects.all()
-    return_url = f"{reverse('schedule_list')}?manage=1"
+    selected_group = get_object_or_404(
+        Group,
+        id=group_id
+    )
 
-    if group_id:
-        selected_group = get_object_or_404(Group, id=group_id)
-        disciplines = disciplines.filter(group=selected_group)
-        return_url = (
-            f"{reverse('schedule_list')}?group_id={selected_group.id}"
-            f"&date={initial_date}&manage=1"
-        )
+    disciplines = Discipline.objects.select_related(
+        'plan',
+        'group',
+        'teacher__user'
+    ).filter(group=selected_group)
+
+    classrooms = Classroom.objects.all()
+
+    return_url = (
+        f"{reverse('schedule_list')}?group_id={selected_group.id}"
+        f"&date={initial_date}&manage=1"
+    )
 
     context = {
         'disciplines': disciplines,
@@ -1016,6 +1060,8 @@ def admin_schedule_create(request):
         'initial_date': initial_date,
         'initial_lesson_number': initial_lesson_number,
         'return_url': return_url,
+        'reset_url': request.get_full_path(),
+        'selected_group': selected_group,
     }
 
     if request.method == 'POST':
@@ -1023,6 +1069,20 @@ def admin_schedule_create(request):
         classroom_id = request.POST.get('classroom_id')
         date = request.POST.get('date')
         lesson_number = request.POST.get('lesson_number')
+
+        discipline = get_object_or_404(
+            Discipline,
+            id=discipline_id,
+            group=selected_group
+        )
+
+        classroom = get_object_or_404(
+            Classroom,
+            id=classroom_id
+        )
+
+        context['selected_discipline_id'] = discipline.id
+        context['selected_classroom_id'] = classroom.id
 
         context['initial_date'] = date
         context['initial_lesson_number'] = lesson_number
@@ -1036,9 +1096,31 @@ def admin_schedule_create(request):
             messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
             return render(request, 'users/admin/schedule_form.html', context)
 
+        classroom_conflicts, teacher_conflicts = get_schedule_conflicts(
+            discipline,
+            classroom,
+            date,
+            lesson_number
+        )
+
+        classroom_conflicts = list(classroom_conflicts)
+        teacher_conflicts = list(teacher_conflicts)
+
+        ignore_conflicts = request.POST.get('ignore_conflicts') == '1'
+
+        if (classroom_conflicts or teacher_conflicts) and not ignore_conflicts:
+            context['classroom_conflicts'] = classroom_conflicts
+            context['teacher_conflicts'] = teacher_conflicts
+
+            return render(
+                request,
+                'users/admin/schedule_form.html',
+                context
+            )
+
         schedule = Schedule.objects.create(
-            discipline_id=discipline_id,
-            classroom_id=classroom_id,
+            discipline=discipline,
+            classroom=classroom,
             date=date,
             lesson_number=lesson_number
         )
@@ -1058,60 +1140,7 @@ def admin_schedule_edit(request, schedule_id):
         f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}"
         f"&date={schedule.date.strftime('%Y-%m-%d')}&manage=1"
     )
-
-    if request.method == 'POST':
-        if has_lesson:
-            discipline_id = schedule.discipline_id
-        else:
-            discipline = get_object_or_404(
-                Discipline,
-                id=request.POST.get('discipline_id'),
-                group=schedule.discipline.group
-            )
-            discipline_id = discipline.id
-
-        classroom_id = request.POST.get('classroom_id')
-        date = request.POST.get('date')
-        lesson_number = request.POST.get('lesson_number')
-
-        try:
-            lesson_number = int(lesson_number)
-            if lesson_number < 1 or lesson_number > 7:
-                messages.error(request, 'Номер пары должен быть от 1 до 7.')
-                disciplines = Discipline.objects.select_related('plan', 'group').filter(group=schedule.discipline.group)
-                classrooms = Classroom.objects.all()
-                context = {
-                    'schedule': schedule,
-                    'disciplines': disciplines,
-                    'classrooms': classrooms,
-                    'return_url': return_url,
-                    'has_lesson': has_lesson,
-                }
-                return render(request, 'users/admin/schedule_form.html', context)
-        except (ValueError, TypeError):
-            messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
-            disciplines = Discipline.objects.select_related('plan', 'group').filter(group=schedule.discipline.group)
-            classrooms = Classroom.objects.all()
-            context = {
-                'schedule': schedule,
-                'disciplines': disciplines,
-                'classrooms': classrooms,
-                'return_url': return_url,
-                'has_lesson': has_lesson,
-            }
-            return render(request, 'users/admin/schedule_form.html', context)
-
-        schedule.discipline_id = discipline_id
-        schedule.classroom_id = classroom_id
-        schedule.date = date
-        schedule.lesson_number = lesson_number
-        schedule.save()
-        messages.success(request, 'Расписание обновлено.')
-        return redirect(
-            f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
-        )
-
-    disciplines = Discipline.objects.select_related('plan', 'group').filter(group=schedule.discipline.group)
+    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').filter(group=schedule.discipline.group)
     classrooms = Classroom.objects.all()
 
     context = {
@@ -1119,8 +1148,82 @@ def admin_schedule_edit(request, schedule_id):
         'disciplines': disciplines,
         'classrooms': classrooms,
         'return_url': return_url,
+        'reset_url': request.path,
         'has_lesson': has_lesson,
+        'selected_group': schedule.discipline.group,
     }
+
+    if request.method == 'POST':
+        if has_lesson:
+            discipline = schedule.discipline
+        else:
+            discipline = get_object_or_404(
+                Discipline,
+                id=request.POST.get('discipline_id'),
+                group=schedule.discipline.group
+            )
+
+        classroom_id = request.POST.get('classroom_id')
+        date = request.POST.get('date')
+        lesson_number = request.POST.get('lesson_number')
+        classroom = get_object_or_404(
+            Classroom,
+            id=classroom_id
+        )
+
+        context['selected_discipline_id'] = discipline.id
+        context['selected_classroom_id'] = classroom.id
+        context['initial_date'] = date
+        context['initial_lesson_number'] = lesson_number
+
+        try:
+            lesson_number = int(lesson_number)
+            if lesson_number < 1 or lesson_number > 7:
+                messages.error(
+                    request,
+                    'Номер пары должен быть от 1 до 7.'
+                )
+                return render(
+                    request,
+                    'users/admin/schedule_form.html',
+                    context
+                )
+        except (ValueError, TypeError):
+            messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
+            return render(request, 'users/admin/schedule_form.html', context)
+
+        classroom_conflicts, teacher_conflicts = get_schedule_conflicts(
+            discipline,
+            classroom,
+            date,
+            lesson_number,
+            exclude_schedule_id=schedule.id
+        )
+
+        classroom_conflicts = list(classroom_conflicts)
+        teacher_conflicts = list(teacher_conflicts)
+
+        ignore_conflicts = request.POST.get('ignore_conflicts') == '1'
+
+        if (classroom_conflicts or teacher_conflicts) and not ignore_conflicts:
+            context['classroom_conflicts'] = classroom_conflicts
+            context['teacher_conflicts'] = teacher_conflicts
+
+            return render(
+                request,
+                'users/admin/schedule_form.html',
+                context
+            )
+
+        schedule.discipline = discipline
+        schedule.classroom = classroom
+        schedule.date = date
+        schedule.lesson_number = lesson_number
+        schedule.save()
+        messages.success(request, 'Расписание обновлено.')
+        return redirect(
+            f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
+        )
     return render(request, 'users/admin/schedule_form.html', context)
 
 
