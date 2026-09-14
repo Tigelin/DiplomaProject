@@ -207,6 +207,15 @@ def student_tasks(request):
     if not show_all:
         tasks_with_status = [t for t in tasks_with_status if not t['is_completed']]
 
+    paginator = Paginator(tasks_with_status, 7)
+    page_number = request.GET.get('page')
+    tasks_with_status = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        tasks_with_status.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     disciplines = Discipline.objects.filter(group=student.group).select_related('plan')
 
     context = {
@@ -215,6 +224,8 @@ def student_tasks(request):
         'disciplines': disciplines,
         'show_all': show_all,
         'selected_discipline_id': discipline_id,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/student/tasks.html', context)
 
