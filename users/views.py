@@ -418,19 +418,7 @@ def teacher_journal(request, discipline_id):
         discipline=discipline
     ).select_related('classroom').order_by('date', 'lesson_number')
 
-    per_page = request.GET.get('per_page', 5)
-    try:
-        per_page = int(per_page)
-    except:
-        per_page = 5
-    if per_page not in [5, 10, 20, 50]:
-        per_page = 5
-
-    paginator = Paginator(schedules, per_page)
-    page_number = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_number)
-
-    for schedule in page_obj:
+    for schedule in schedules:
         lesson = Lesson.objects.filter(schedule=schedule).first()
         schedule.has_lesson = lesson is not None
         if schedule.has_lesson:
@@ -445,7 +433,7 @@ def teacher_journal(request, discipline_id):
     grades_matrix = {}
     for student in students:
         grades_matrix[student.id] = {}
-        for schedule in page_obj:
+        for schedule in schedules:
             if schedule.has_lesson:
                 for task in schedule.tasks:
                     grades_matrix[student.id][task.id] = None
@@ -464,9 +452,8 @@ def teacher_journal(request, discipline_id):
         'teacher': teacher,
         'discipline': discipline,
         'students': students,
-        'schedules': page_obj,
+        'schedules': schedules,
         'grades_matrix': grades_matrix,
-        'per_page': per_page,
     }
     return render(request, 'users/teacher/journal.html', context)
 

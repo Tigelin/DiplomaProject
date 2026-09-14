@@ -22,18 +22,7 @@
     <div class="card-body">
 
         <div class="row mb-3">
-            <div class="col-md-4">
-                <form method="get" class="form-inline">
-                    <label class="mr-2">Занятий на странице:</label>
-                    <select name="per_page" class="form-select form-select-sm" style="width: auto; display: inline-block;" onchange="this.form.submit()">
-                        <option value="5" {% if per_page == 5 %}selected{% endif %}>5</option>
-                        <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
-                        <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
-                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
-                    </select>
-                </form>
-            </div>
-            <div class="col-md-8 text-end">
+            <div class="col-md-12 text-end">
                 <a href="{% url 'export_journal_excel' discipline.id %}" class="btn btn-success">
                     <i class="bi bi-file-earmark-excel"></i> Excel
                 </a>
@@ -45,8 +34,8 @@
 
         {% if students and schedules %}
 
-            <div class="table-responsive">
-                <table class="table table-bordered text-center align-middle">
+            <div id="journal-table-container" class="table-responsive journal-table-container">
+                <table class="table table-bordered text-center align-middle journal-table">
                     <thead class="table-dark">
                         <tr>
                             <th style="min-width: 150px; vertical-align: middle;">Студент</th>
@@ -132,36 +121,6 @@
                 </table>
             </div>
 
-            {% if schedules.has_other_pages %}
-                <nav aria-label="Page navigation" class="mt-4">
-                    <ul class="pagination justify-content-center">
-                        {% if schedules.has_previous %}
-                            <li class="page-item"><a class="page-link" href="?page=1&per_page={{ per_page }}">««</a></li>
-                            <li class="page-item"><a class="page-link" href="?page={{ schedules.previous_page_number }}&per_page={{ per_page }}">«</a></li>
-                        {% else %}
-                            <li class="page-item disabled"><a class="page-link" href="#">««</a></li>
-                            <li class="page-item disabled"><a class="page-link" href="#">«</a></li>
-                        {% endif %}
-
-                        {% for num in schedules.paginator.page_range %}
-                            {% if schedules.number == num %}
-                                <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
-                            {% elif num > schedules.number|add:'-3' and num < schedules.number|add:'3' %}
-                                <li class="page-item"><a class="page-link" href="?page={{ num }}&per_page={{ per_page }}">{{ num }}</a></li>
-                            {% endif %}
-                        {% endfor %}
-
-                        {% if schedules.has_next %}
-                            <li class="page-item"><a class="page-link" href="?page={{ schedules.next_page_number }}&per_page={{ per_page }}">»</a></li>
-                            <li class="page-item"><a class="page-link" href="?page={{ schedules.paginator.num_pages }}&per_page={{ per_page }}">»»</a></li>
-                        {% else %}
-                            <li class="page-item disabled"><a class="page-link" href="#">»</a></li>
-                            <li class="page-item disabled"><a class="page-link" href="#">»»</a></li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            {% endif %}
-
         {% else %}
 
             <div class="alert alert-info text-center">
@@ -181,5 +140,15 @@
 
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const journalTableContainer = document.getElementById('journal-table-container');
+
+        if (journalTableContainer) {
+            journalTableContainer.scrollLeft = journalTableContainer.scrollWidth;
+        }
+    });
+</script>
 
 {% endblock %}

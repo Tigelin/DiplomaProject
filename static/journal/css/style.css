@@ -25,3 +25,22 @@
 .text-orange {
     color: #fd7e14 !important;
 }
+
+.journal-table-container {
+    overflow-x: auto;
+}
+
+.journal-table tr > :first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+}
+
+.journal-table thead tr > :first-child {
+    background-color: #212529;
+    z-index: 2;
+}
+
+.journal-table tbody tr > :first-child {
+    background-color: #f8f9fa;
+}
