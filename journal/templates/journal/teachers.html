@@ -31,7 +31,9 @@
         </form>
 
         <div class="row">
+
             {% for teacher in teachers %}
+
             <div class="col-md-4 col-lg-3 mb-3">
                 <div class="card h-100">
                     <div class="card-body text-center">
@@ -41,14 +43,72 @@
                     </div>
                 </div>
             </div>
+
             {% empty %}
+
             <div class="col-12">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i> Преподаватели не найдены.
                 </div>
             </div>
+
             {% endfor %}
         </div>
+
+        {% if teachers.has_other_pages %}
+
+        <nav aria-label="Навигация по страницам преподавателей" class="mt-3">
+            <ul class="pagination justify-content-center">
+
+                {% if teachers.has_previous %}
+
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ teachers.previous_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                        Назад
+                    </a>
+                </li>
+
+                {% endif %}
+
+                {% for page_number in page_range %}
+
+                    {% if page_number == ellipsis %}
+
+                    <li class="page-item disabled">
+                        <span class="page-link">{{ page_number }}</span>
+                    </li>
+
+                    {% elif page_number == teachers.number %}
+
+                    <li class="page-item active" aria-current="page">
+                        <span class="page-link">{{ page_number }}</span>
+                    </li>
+
+                    {% else %}
+
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                            {{ page_number }}
+                        </a>
+                    </li>
+
+                    {% endif %}
+
+                {% endfor %}
+
+                {% if teachers.has_next %}
+
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ teachers.next_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                        Вперёд
+                    </a>
+                </li>
+
+                {% endif %}
+            </ul>
+        </nav>
+
+        {% endif %}
 
         <a href="{% url 'home' %}" class="btn btn-secondary mt-3">
             <i class="bi bi-arrow-left"></i> На главную

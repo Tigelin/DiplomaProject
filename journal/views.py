@@ -11,13 +11,18 @@ from .models import (
     DisciplinePlan
 )
 from django.db.models import Q
+from django.core.paginator import Paginator
 
 def home(request):
     return render(request, 'journal/home.html')
 
 
 def teachers_list(request):
-    teachers = Teacher.objects.select_related('user').all()
+    teachers = Teacher.objects.select_related('user').order_by(
+        'user__last_name',
+        'user__first_name',
+        'user__patronymic',
+    )
 
     search = request.GET.get('search', '')
     if search:
@@ -27,9 +32,20 @@ def teachers_list(request):
             Q(user__patronymic__icontains=search)
         )
 
+    paginator = Paginator(teachers, 12)
+    page_number = request.GET.get('page')
+    teachers = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        teachers.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'teachers': teachers,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/teachers.html', context)
 
@@ -40,7 +56,13 @@ def departments_list(request):
 
 
 def groups_list(request):
-    groups = Group.objects.select_related('specialty__department').all()
+    groups = Group.objects.select_related(
+        'specialty__department'
+    ).order_by(
+        'specialty__name',
+        'name',
+        'year',
+    )
 
     search = request.GET.get('search', '')
     if search:
@@ -51,15 +73,33 @@ def groups_list(request):
             Q(specialty__name__icontains=search)
         )
 
+    paginator = Paginator(groups, 15)
+    page_number = request.GET.get('page')
+    groups = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        groups.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'groups': groups,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/groups.html', context)
 
 
 def disciplines_list(request):
-    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').all()
+    disciplines = Discipline.objects.select_related(
+        'plan',
+        'group',
+        'teacher__user',
+    ).order_by(
+        'plan__name',
+        'group__name',
+    )
 
     search = request.GET.get('search', '')
     if search:
@@ -70,9 +110,20 @@ def disciplines_list(request):
             Q(teacher__user__first_name__icontains=search)
         )
 
+    paginator = Paginator(disciplines, 15)
+    page_number = request.GET.get('page')
+    disciplines = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        disciplines.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'disciplines': disciplines,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/disciplines.html', context)
 
@@ -84,15 +135,29 @@ def discipline_plans_list(request):
     if search:
         plans = plans.filter(name__icontains=search)
 
+    paginator = Paginator(plans, 15)
+    page_number = request.GET.get('page')
+    plans = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        plans.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'plans': plans,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/discipline_plans.html', context)
 
 
 def specialties_list(request):
-    specialties = Specialty.objects.select_related('department').all()
+    specialties = Specialty.objects.select_related('department').order_by(
+        'name',
+        'code',
+    )
 
     search = request.GET.get('search', '')
     if search:
@@ -103,9 +168,20 @@ def specialties_list(request):
             Q(department__name__icontains=search)
         )
 
+    paginator = Paginator(specialties, 6)
+    page_number = request.GET.get('page')
+    specialties = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        specialties.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'specialties': specialties,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'journal/specialties.html', context)
 
@@ -119,20 +195,31 @@ def schedule_list(request):
         selected_group = get_object_or_404(Group, id=group_id)
 
     week_offset = int(request.GET.get('week_offset', 0))
+    selected_date = request.GET.get('date', '')
 
     week_days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 
-    today = timezone.now().date()
-    target_date = today + timedelta(weeks=week_offset)
+    today = timezone.localdate()
+    target_date = today
+
+    if selected_date:
+        try:
+            target_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = ''
+
+    target_date += timedelta(weeks=week_offset)
     monday = target_date - timedelta(days=target_date.weekday())
     week_dates = [monday + timedelta(days=i) for i in range(7)]
 
+    current_monday = today - timedelta(days=today.weekday())
+    is_current_week = monday == current_monday
+
     today_index = -1
-    if week_offset == 0:
-        for i, date in enumerate(week_dates):
-            if date == today:
-                today_index = i
-                break
+    for i, date in enumerate(week_dates):
+        if date == today:
+            today_index = i
+            break
 
     week_range = f"{monday.strftime('%d.%m.%Y')} — {(monday + timedelta(days=6)).strftime('%d.%m.%Y')}"
     week_schedule = [(week_days[i], week_dates[i]) for i in range(7)]
@@ -157,6 +244,8 @@ def schedule_list(request):
                 schedule_grid[weekday] = {}
             schedule_grid[weekday][s.lesson_number] = s
 
+    manage_mode = request.GET.get('manage') == '1' and request.user.is_staff
+
     context = {
         'groups': groups,
         'selected_group': selected_group,
@@ -167,6 +256,12 @@ def schedule_list(request):
         'today_index': today_index,
         'week_offset': week_offset,
         'week_range': week_range,
+        'selected_date': selected_date,
+        'is_current_week': is_current_week,
+        'manage_mode': manage_mode,
+        'week_dates_by_index': {
+            i: date for i, date in enumerate(week_dates)
+        },
     }
     return render(request, 'journal/schedule.html', context)
 

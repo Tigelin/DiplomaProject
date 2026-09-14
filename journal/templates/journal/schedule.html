@@ -3,23 +3,57 @@
 {% load dict_extras %}
 {% load roman_numbers %}
 
-{% block title %}Расписание{% endblock %}
+{% block title %}
+
+    {% if manage_mode %}
+        Управление расписанием
+    {% else %}
+        Расписание
+    {% endif %}
+
+{% endblock %}
 
 {% block breadcrumbs %}
 
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
-    <li class="breadcrumb-item active">Расписание</li>
+    <li class="breadcrumb-item active">
+
+        {% if manage_mode %}
+            Управление расписанием
+        {% else %}
+            Расписание
+        {% endif %}
+
+    </li>
 
 {% endblock %}
 
 {% block content %}
 
 <div class="card">
-    <div class="card-header bg-primary text-white">
-        <h4 class="mb-0"><i class="bi bi-calendar-week"></i> Расписание занятий</h4>
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">
+            <i class="bi bi-calendar-week"></i>
+            {% if manage_mode %}
+                Управление расписанием
+            {% else %}
+                Расписание занятий
+            {% endif %}
+        </h4>
+
+        {% if manage_mode %}
+            <a href="{% url 'admin_dashboard' %}" class="btn btn-light btn-sm">
+                <i class="bi bi-arrow-left"></i> В панель
+            </a>
+        {% endif %}
     </div>
     <div class="card-body">
         <form method="get" class="row g-3 mb-4" id="scheduleForm">
+
+            {% if manage_mode %}
+                <input type="hidden" name="manage" value="1">
+            {% endif %}
+
             <div class="col-md-4">
                 <label class="form-label">Выберите группу:</label>
                 <select name="group_id" class="form-select">
@@ -31,6 +65,15 @@
                     {% endfor %}
                 </select>
             </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Выберите дату:</label>
+                <input type="date"
+                       name="date"
+                       class="form-control"
+                       value="{{ selected_date }}">
+            </div>
+
             <div class="col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-eye"></i> Показать
@@ -41,23 +84,27 @@
         {% if selected_group %}
 
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <a href="?group_id={{ selected_group.id }}&week_offset={{ week_offset|add:-1 }}" class="btn btn-outline-secondary">
+                <a href="?group_id={{ selected_group.id }}&date={{ selected_date }}&week_offset={{ week_offset|add:-1 }}{% if manage_mode %}&manage=1{% endif %}"
+                   class="btn btn-outline-secondary">
                     <i class="bi bi-chevron-left"></i> Предыдущая неделя
                 </a>
+
                 <div class="text-center">
                     <strong>{{ week_range }}</strong>
-                    {% if week_offset == 0 %}
+                    {% if is_current_week %}
                         <span class="badge bg-success ms-2">Текущая неделя</span>
                     {% endif %}
                 </div>
-                <a href="?group_id={{ selected_group.id }}&week_offset={{ week_offset|add:1 }}" class="btn btn-outline-secondary">
+
+                <a href="?group_id={{ selected_group.id }}&date={{ selected_date }}&week_offset={{ week_offset|add:1 }}{% if manage_mode %}&manage=1{% endif %}"
+                   class="btn btn-outline-secondary">
                     Следующая неделя <i class="bi bi-chevron-right"></i>
                 </a>
             </div>
 
-            {% if week_offset != 0 %}
+            {% if selected_date or week_offset != 0 %}
                 <div class="text-center mb-3">
-                    <a href="?group_id={{ selected_group.id }}&week_offset=0" class="btn btn-sm btn-primary">
+                    <a href="?group_id={{ selected_group.id }}{% if manage_mode %}&manage=1{% endif %}" class="btn btn-sm btn-primary">
                         <i class="bi bi-calendar-week"></i> Вернуться к текущей неделе
                     </a>
                 </div>
@@ -89,9 +136,18 @@
                         <tr>
                             <th class="bg-light">{{ num|to_roman }}</th>
                             {% for i in range_0_6 %}
-                                <td class="align-middle {% if i == today_index %}bg-info bg-opacity-25{% endif %}">
+                                <td class="align-middle {% if manage_mode %}p-0{% endif %} {% if i == today_index %}bg-info bg-opacity-25{% endif %}">
                                     {% with schedule_grid|get_by_key:i|get_by_key:num as s %}
+
                                         {% if s %}
+
+                                            {% if manage_mode %}
+
+                                                <a href="{% url 'admin_schedule_edit' s.id %}"
+                                                   class="d-block p-2 text-decoration-none text-reset">
+
+                                            {% endif %}
+
                                             <strong>{{ s.discipline.plan.name }}</strong><br>
                                             <small class="text-muted">{{ s.classroom.number }}</small>
                                             <div class="small text-secondary mt-1">
@@ -101,9 +157,27 @@
                                                     {{ s.discipline.teacher.user.patronymic|slice:":1" }}.
                                                 {% endif %}
                                             </div>
+
+                                            {% if manage_mode %}
+
+                                                <div class="small text-primary mt-1">
+                                                    <i class="bi bi-pencil"></i> Редактировать
+                                                </div>
+                                                </a>
+
+                                            {% endif %}
+
+                                        {% elif manage_mode %}
+
+                                            <a href="{% url 'admin_schedule_create' %}?group_id={{ selected_group.id }}&date={{ week_dates_by_index|get_by_key:i|date:'Y-m-d' }}&lesson_number={{ num }}"
+                                               class="btn btn-sm btn-outline-primary my-2">
+                                                <i class="bi bi-plus"></i> Добавить занятие
+                                            </a>
+
                                         {% else %}
                                             <span class="text-muted">—</span>
                                         {% endif %}
+
                                     {% endwith %}
                                 </td>
                             {% endfor %}

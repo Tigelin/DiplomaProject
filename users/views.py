@@ -13,13 +13,15 @@ from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Q
+from django.db.models import Q, Sum
 from journal.models import (
     Grade, Task, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
     Teacher, Classroom
 )
 from .forms import LessonFileUploadForm
+from django.urls import reverse
+from django.views.decorators.http import require_POST
 
 # Create your views here.
 
@@ -205,6 +207,15 @@ def student_tasks(request):
     if not show_all:
         tasks_with_status = [t for t in tasks_with_status if not t['is_completed']]
 
+    paginator = Paginator(tasks_with_status, 7)
+    page_number = request.GET.get('page')
+    tasks_with_status = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        tasks_with_status.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     disciplines = Discipline.objects.filter(group=student.group).select_related('plan')
 
     context = {
@@ -213,6 +224,8 @@ def student_tasks(request):
         'disciplines': disciplines,
         'show_all': show_all,
         'selected_discipline_id': discipline_id,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/student/tasks.html', context)
 
@@ -358,25 +371,42 @@ def teacher_groups(request):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    groups = Group.objects.filter(
-        discipline__teacher=teacher
-    ).distinct()
+    disciplines = Discipline.objects.filter(
+        teacher=teacher
+    ).select_related(
+        'plan',
+        'group__specialty',
+    ).annotate(
+        actual_hours=Sum('schedule__lesson__hours')
+    ).order_by(
+        '-group__year',
+        'group__name',
+        'plan__name',
+    )
 
-    for group in groups:
-        disciplines = Discipline.objects.filter(group=group, teacher=teacher)
-        group.disciplines = disciplines
-        for discipline in disciplines:
-            total_hours = 0
-            lessons = Lesson.objects.filter(
-                schedule__discipline=discipline
-            )
-            for lesson in lessons:
-                total_hours += lesson.hours
-            discipline.actual_hours = total_hours
+    search = request.GET.get('search', '')
+    if search:
+        disciplines = disciplines.filter(
+            Q(plan__name__icontains=search) |
+            Q(group__name__icontains=search) |
+            Q(group__specialty__name__icontains=search)
+        )
+
+    paginator = Paginator(disciplines, 15)
+    page_number = request.GET.get('page')
+    disciplines = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        disciplines.number,
+        on_each_side=2,
+        on_ends=1,
+    )
 
     context = {
         'teacher': teacher,
-        'groups': groups,
+        'disciplines': disciplines,
+        'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/teacher/groups.html', context)
 
@@ -401,19 +431,7 @@ def teacher_journal(request, discipline_id):
         discipline=discipline
     ).select_related('classroom').order_by('date', 'lesson_number')
 
-    per_page = request.GET.get('per_page', 5)
-    try:
-        per_page = int(per_page)
-    except:
-        per_page = 5
-    if per_page not in [5, 10, 20, 50]:
-        per_page = 5
-
-    paginator = Paginator(schedules, per_page)
-    page_number = request.GET.get('page', 1)
-    page_obj = paginator.get_page(page_number)
-
-    for schedule in page_obj:
+    for schedule in schedules:
         lesson = Lesson.objects.filter(schedule=schedule).first()
         schedule.has_lesson = lesson is not None
         if schedule.has_lesson:
@@ -428,7 +446,7 @@ def teacher_journal(request, discipline_id):
     grades_matrix = {}
     for student in students:
         grades_matrix[student.id] = {}
-        for schedule in page_obj:
+        for schedule in schedules:
             if schedule.has_lesson:
                 for task in schedule.tasks:
                     grades_matrix[student.id][task.id] = None
@@ -443,13 +461,34 @@ def teacher_journal(request, discipline_id):
         if student_id in grades_matrix and task_id in grades_matrix[student_id]:
             grades_matrix[student_id][task_id] = grade.value
 
+    attendance_matrix = {}
+    for student in students:
+        attendance_matrix[student.id] = {}
+        for schedule in schedules:
+            if schedule.has_lesson:
+                attendance_matrix[student.id][schedule.lesson.id] = 'Присутствовал'
+
+    attendances = Attendance.objects.filter(
+        lesson__schedule__discipline=discipline
+    ).select_related('student', 'lesson', 'attendance_type')
+
+    for attendance in attendances:
+        student_id = attendance.student.id
+        lesson_id = attendance.lesson.id
+
+        if student_id in attendance_matrix and lesson_id in attendance_matrix[student_id]:
+            if attendance.attendance_type:
+                attendance_matrix[student_id][lesson_id] = attendance.attendance_type.name
+            else:
+                attendance_matrix[student_id][lesson_id] = '—'
+
     context = {
         'teacher': teacher,
         'discipline': discipline,
         'students': students,
-        'schedules': page_obj,
+        'schedules': schedules,
         'grades_matrix': grades_matrix,
-        'per_page': per_page,
+        'attendance_matrix': attendance_matrix,
     }
     return render(request, 'users/teacher/journal.html', context)
 
@@ -961,136 +1000,264 @@ def admin_dashboard(request):
 
 @staff_member_required
 def admin_schedules(request):
-    schedules = Schedule.objects.select_related('discipline__plan', 'discipline__group', 'classroom').order_by('date',
-                                                                                                               'lesson_number')
+    return redirect(f"{reverse('schedule_list')}?manage=1")
 
-    search = request.GET.get('search', '')
-    if search:
-        schedules = schedules.filter(
-            Q(discipline__plan__name__icontains=search) |
-            Q(discipline__group__name__icontains=search) |
-            Q(classroom__number__icontains=search) |
-            Q(date__icontains=search)
-        )
 
-    context = {
-        'schedules': schedules,
-        'search': search,
-    }
-    return render(request, 'users/admin/schedules.html', context)
+def get_schedule_conflicts(
+    discipline,
+    classroom,
+    date,
+    lesson_number,
+    exclude_schedule_id=None
+):
+    schedules = Schedule.objects.filter(
+        date=date,
+        lesson_number=lesson_number
+    ).select_related(
+        'discipline__plan',
+        'discipline__group',
+        'discipline__teacher__user',
+        'classroom'
+    )
+
+    if exclude_schedule_id:
+        schedules = schedules.exclude(id=exclude_schedule_id)
+
+    classroom_conflicts = schedules.filter(classroom=classroom)
+    teacher_conflicts = schedules.filter(
+        discipline__teacher=discipline.teacher
+    )
+
+    return classroom_conflicts, teacher_conflicts
 
 
 @staff_member_required
 def admin_schedule_create(request):
+    group_id = request.GET.get('group_id')
+
+    if not group_id:
+        messages.error(
+            request,
+            'Сначала выберите группу в расписании.'
+        )
+        return redirect(
+            f"{reverse('schedule_list')}?manage=1"
+        )
+
+    initial_date = request.GET.get('date', '')
+    initial_lesson_number = request.GET.get('lesson_number', '')
+
+    selected_group = get_object_or_404(
+        Group,
+        id=group_id
+    )
+
+    disciplines = Discipline.objects.select_related(
+        'plan',
+        'group',
+        'teacher__user'
+    ).filter(group=selected_group)
+
+    classrooms = Classroom.objects.all()
+
+    return_url = (
+        f"{reverse('schedule_list')}?group_id={selected_group.id}"
+        f"&date={initial_date}&manage=1"
+    )
+
+    context = {
+        'disciplines': disciplines,
+        'classrooms': classrooms,
+        'initial_date': initial_date,
+        'initial_lesson_number': initial_lesson_number,
+        'return_url': return_url,
+        'reset_url': request.get_full_path(),
+        'selected_group': selected_group,
+    }
+
     if request.method == 'POST':
         discipline_id = request.POST.get('discipline_id')
         classroom_id = request.POST.get('classroom_id')
         date = request.POST.get('date')
         lesson_number = request.POST.get('lesson_number')
 
+        discipline = get_object_or_404(
+            Discipline,
+            id=discipline_id,
+            group=selected_group
+        )
+
+        classroom = get_object_or_404(
+            Classroom,
+            id=classroom_id
+        )
+
+        context['selected_discipline_id'] = discipline.id
+        context['selected_classroom_id'] = classroom.id
+
+        context['initial_date'] = date
+        context['initial_lesson_number'] = lesson_number
+
         try:
             lesson_number = int(lesson_number)
             if lesson_number < 1 or lesson_number > 7:
                 messages.error(request, 'Номер пары должен быть от 1 до 7.')
-                disciplines = Discipline.objects.select_related('plan', 'group').all()
-                classrooms = Classroom.objects.all()
-                context = {
-                    'disciplines': disciplines,
-                    'classrooms': classrooms,
-                }
                 return render(request, 'users/admin/schedule_form.html', context)
         except (ValueError, TypeError):
             messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
-            disciplines = Discipline.objects.select_related('plan', 'group').all()
-            classrooms = Classroom.objects.all()
-            context = {
-                'disciplines': disciplines,
-                'classrooms': classrooms,
-            }
             return render(request, 'users/admin/schedule_form.html', context)
 
-        Schedule.objects.create(
-            discipline_id=discipline_id,
-            classroom_id=classroom_id,
+        classroom_conflicts, teacher_conflicts = get_schedule_conflicts(
+            discipline,
+            classroom,
+            date,
+            lesson_number
+        )
+
+        classroom_conflicts = list(classroom_conflicts)
+        teacher_conflicts = list(teacher_conflicts)
+
+        ignore_conflicts = request.POST.get('ignore_conflicts') == '1'
+
+        if (classroom_conflicts or teacher_conflicts) and not ignore_conflicts:
+            context['classroom_conflicts'] = classroom_conflicts
+            context['teacher_conflicts'] = teacher_conflicts
+
+            return render(
+                request,
+                'users/admin/schedule_form.html',
+                context
+            )
+
+        schedule = Schedule.objects.create(
+            discipline=discipline,
+            classroom=classroom,
             date=date,
             lesson_number=lesson_number
         )
         messages.success(request, 'Расписание добавлено.')
-        return redirect('admin_schedules')
+        return redirect(
+            f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
+        )
 
-    disciplines = Discipline.objects.select_related('plan', 'group').all()
-    classrooms = Classroom.objects.all()
-
-    context = {
-        'disciplines': disciplines,
-        'classrooms': classrooms,
-    }
     return render(request, 'users/admin/schedule_form.html', context)
 
 
 @staff_member_required
 def admin_schedule_edit(request, schedule_id):
     schedule = get_object_or_404(Schedule, id=schedule_id)
-
-    if request.method == 'POST':
-        discipline_id = request.POST.get('discipline_id')
-        classroom_id = request.POST.get('classroom_id')
-        date = request.POST.get('date')
-        lesson_number = request.POST.get('lesson_number')
-
-        try:
-            lesson_number = int(lesson_number)
-            if lesson_number < 1 or lesson_number > 7:
-                messages.error(request, 'Номер пары должен быть от 1 до 7.')
-                disciplines = Discipline.objects.select_related('plan', 'group').all()
-                classrooms = Classroom.objects.all()
-                context = {
-                    'schedule': schedule,
-                    'disciplines': disciplines,
-                    'classrooms': classrooms,
-                }
-                return render(request, 'users/admin/schedule_form.html', context)
-        except (ValueError, TypeError):
-            messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
-            disciplines = Discipline.objects.select_related('plan', 'group').all()
-            classrooms = Classroom.objects.all()
-            context = {
-                'schedule': schedule,
-                'disciplines': disciplines,
-                'classrooms': classrooms,
-            }
-            return render(request, 'users/admin/schedule_form.html', context)
-
-        schedule.discipline_id = discipline_id
-        schedule.classroom_id = classroom_id
-        schedule.date = date
-        schedule.lesson_number = lesson_number
-        schedule.save()
-        messages.success(request, 'Расписание обновлено.')
-        return redirect('admin_schedules')
-
-    disciplines = Discipline.objects.select_related('plan', 'group').all()
+    has_lesson = Lesson.objects.filter(schedule=schedule).exists()
+    return_url = (
+        f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}"
+        f"&date={schedule.date.strftime('%Y-%m-%d')}&manage=1"
+    )
+    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').filter(group=schedule.discipline.group)
     classrooms = Classroom.objects.all()
 
     context = {
         'schedule': schedule,
         'disciplines': disciplines,
         'classrooms': classrooms,
+        'return_url': return_url,
+        'reset_url': request.path,
+        'has_lesson': has_lesson,
+        'selected_group': schedule.discipline.group,
     }
+
+    if request.method == 'POST':
+        if has_lesson:
+            discipline = schedule.discipline
+        else:
+            discipline = get_object_or_404(
+                Discipline,
+                id=request.POST.get('discipline_id'),
+                group=schedule.discipline.group
+            )
+
+        classroom_id = request.POST.get('classroom_id')
+        date = request.POST.get('date')
+        lesson_number = request.POST.get('lesson_number')
+        classroom = get_object_or_404(
+            Classroom,
+            id=classroom_id
+        )
+
+        context['selected_discipline_id'] = discipline.id
+        context['selected_classroom_id'] = classroom.id
+        context['initial_date'] = date
+        context['initial_lesson_number'] = lesson_number
+
+        try:
+            lesson_number = int(lesson_number)
+            if lesson_number < 1 or lesson_number > 7:
+                messages.error(
+                    request,
+                    'Номер пары должен быть от 1 до 7.'
+                )
+                return render(
+                    request,
+                    'users/admin/schedule_form.html',
+                    context
+                )
+        except (ValueError, TypeError):
+            messages.error(request, 'Номер пары должен быть числом от 1 до 7.')
+            return render(request, 'users/admin/schedule_form.html', context)
+
+        classroom_conflicts, teacher_conflicts = get_schedule_conflicts(
+            discipline,
+            classroom,
+            date,
+            lesson_number,
+            exclude_schedule_id=schedule.id
+        )
+
+        classroom_conflicts = list(classroom_conflicts)
+        teacher_conflicts = list(teacher_conflicts)
+
+        ignore_conflicts = request.POST.get('ignore_conflicts') == '1'
+
+        if (classroom_conflicts or teacher_conflicts) and not ignore_conflicts:
+            context['classroom_conflicts'] = classroom_conflicts
+            context['teacher_conflicts'] = teacher_conflicts
+
+            return render(
+                request,
+                'users/admin/schedule_form.html',
+                context
+            )
+
+        schedule.discipline = discipline
+        schedule.classroom = classroom
+        schedule.date = date
+        schedule.lesson_number = lesson_number
+        schedule.save()
+        messages.success(request, 'Расписание обновлено.')
+        return redirect(
+            f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
+        )
     return render(request, 'users/admin/schedule_form.html', context)
 
 
 @staff_member_required
+@require_POST
 def admin_schedule_delete(request, schedule_id):
     schedule = get_object_or_404(Schedule, id=schedule_id)
 
+    group_id = schedule.discipline.group_id
+    date = schedule.date.strftime('%Y-%m-%d')
+
     if Lesson.objects.filter(schedule=schedule).exists():
-        messages.error(request, 'Нельзя удалить расписание, так как к нему уже прикреплено занятие.')
-        return redirect('admin_schedules')
+        messages.error(
+            request,
+            'Нельзя удалить расписание, так как к нему уже прикреплено занятие.'
+        )
+        return redirect('admin_schedule_edit', schedule_id=schedule.id)
 
     schedule.delete()
     messages.success(request, 'Расписание удалено.')
-    return redirect('admin_schedules')
+    return redirect(
+        f"{reverse('schedule_list')}?group_id={group_id}&date={date}&manage=1"
+    )
 
 
 @staff_member_required
@@ -1101,9 +1268,20 @@ def admin_discipline_plans(request):
     if search:
         plans = plans.filter(name__icontains=search)
 
+    paginator = Paginator(plans, 12)
+    page_number = request.GET.get('page')
+    plans = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        plans.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'plans': plans,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/admin/discipline_plans.html', context)
 
@@ -1156,7 +1334,14 @@ def admin_discipline_plan_delete(request, plan_id):
 
 @staff_member_required
 def admin_disciplines(request):
-    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').all()
+    disciplines = Discipline.objects.select_related(
+        'plan',
+        'group',
+        'teacher__user',
+    ).order_by(
+        'plan__name',
+        'group__name',
+    )
 
     search = request.GET.get('search', '')
     if search:
@@ -1167,9 +1352,20 @@ def admin_disciplines(request):
             Q(teacher__user__first_name__icontains=search)
         )
 
+    paginator = Paginator(disciplines, 12)
+    page_number = request.GET.get('page')
+    disciplines = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        disciplines.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'disciplines': disciplines,
         'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/admin/disciplines.html', context)
 

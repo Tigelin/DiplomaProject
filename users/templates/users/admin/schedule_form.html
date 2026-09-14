@@ -8,7 +8,7 @@
 
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
     <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
-    <li class="breadcrumb-item"><a href="{% url 'admin_schedules' %}">Расписание</a></li>
+    <li class="breadcrumb-item"><a href="{{ return_url }}">Расписание</a></li>
     <li class="breadcrumb-item active">
         {% if schedule %}Редактирование{% else %}Добавление{% endif %}
     </li>
@@ -25,20 +25,44 @@
         </h4>
     </div>
     <div class="card-body">
-        
+
+        <p class="mb-3">
+            <strong>Группа:</strong> {{ selected_group.name }}
+        </p>
+
         <form method="post">
             {% csrf_token %}
             
             <div class="mb-3">
                 <label class="form-label">Дисциплина</label>
-                <select name="discipline_id" class="form-select" required>
+                <select name="discipline_id" class="form-select" required {% if has_lesson %}disabled{% endif %}>
                     <option value="">-- Выберите --</option>
                     {% for discipline in disciplines %}
-                        <option value="{{ discipline.id }}" {% if schedule.discipline.id == discipline.id %}selected{% endif %}>
-                            {{ discipline.plan.name }} ({{ discipline.group.name }})
+                        <option value="{{ discipline.id }}"
+                            {% if selected_discipline_id %}
+                                {% if selected_discipline_id == discipline.id %}selected{% endif %}
+                            {% elif schedule.discipline.id == discipline.id %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ discipline.plan.name }} —
+                            {{ discipline.teacher.user.last_name }}
+
+                            {% if discipline.teacher.user.first_name %}
+                                {{ discipline.teacher.user.first_name|first }}.
+                            {% endif %}
+
+                            {% if discipline.teacher.user.patronymic %}
+                                {{ discipline.teacher.user.patronymic|first }}.
+                            {% endif %}
                         </option>
                     {% endfor %}
                 </select>
+                {% if has_lesson %}
+                    <div class="form-text">
+                        Дисциплину нельзя изменить, так как занятие уже проведено.
+                    </div>
+                {% endif %}
             </div>
             
             <div class="mb-3">
@@ -46,7 +70,13 @@
                 <select name="classroom_id" class="form-select" required>
                     <option value="">-- Выберите --</option>
                     {% for classroom in classrooms %}
-                        <option value="{{ classroom.id }}" {% if schedule.classroom.id == classroom.id %}selected{% endif %}>
+                        <option value="{{ classroom.id }}"
+                            {% if selected_classroom_id %}
+                                {% if selected_classroom_id == classroom.id %}selected{% endif %}
+                            {% elif schedule.classroom.id == classroom.id %}
+                                selected
+                            {% endif %}
+                        >
                             {{ classroom.number }} ({{ classroom.department.name }})
                         </option>
                     {% endfor %}
@@ -55,22 +85,111 @@
             
             <div class="mb-3">
                 <label class="form-label">Дата</label>
-                <input type="date" name="date" class="form-control" value="{{ schedule.date|date:'Y-m-d' }}" required>
+                <input type="date"
+                   name="date"
+                   class="form-control"
+                   value="{% if initial_date %}{{ initial_date }}{% elif schedule %}{{ schedule.date|date:'Y-m-d' }}{% endif %}"
+                   required
+                >
             </div>
             
             <div class="mb-3">
                 <label class="form-label">Номер пары</label>
-                <input type="number" name="lesson_number" class="form-control" value="{{ schedule.lesson_number }}" min="1" max="7" required>
+                <input type="number"
+                   name="lesson_number"
+                   class="form-control"
+                   value="{% if initial_lesson_number %}{{ initial_lesson_number }}{% elif schedule %}{{ schedule.lesson_number }}{% endif %}"
+                   min="1"
+                   max="7"
+                   required
+                >
             </div>
             
+            {% if classroom_conflicts %}
+
+                <div class="alert alert-warning">
+                    <h5>
+                        Кабинет {{ classroom_conflicts.0.classroom.number }}
+                        уже используется:
+                    </h5>
+
+                    <ul class="mb-0">
+                        {% for conflict in classroom_conflicts %}
+                            <li>
+                                {{ conflict.date|date:"d.m.Y" }},
+                                {{ conflict.lesson_number }} пара —
+                                {{ conflict.discipline.plan.name }},
+                                группа {{ conflict.discipline.group.name }},
+                                преподаватель
+                                {{ conflict.discipline.teacher.user.get_full_name }}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+            {% endif %}
+
+            {% if teacher_conflicts %}
+
+                <div class="alert alert-warning">
+                    <h5>
+                        Преподаватель
+                        {{ teacher_conflicts.0.discipline.teacher.user.get_full_name }}
+                        уже указан в расписании:
+                    </h5>
+
+                    <ul class="mb-0">
+                        {% for conflict in teacher_conflicts %}
+                            <li>
+                                {{ conflict.date|date:"d.m.Y" }},
+                                {{ conflict.lesson_number }} пара —
+                                {{ conflict.discipline.plan.name }},
+                                группа {{ conflict.discipline.group.name }},
+                                кабинет {{ conflict.classroom.number }}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+            {% endif %}
+
+            {% if classroom_conflicts or teacher_conflicts %}
+                <button type="submit"
+                        name="ignore_conflicts"
+                        value="1"
+                        class="btn btn-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Игнорировать
+                </button>
+
+                <a href="{{ reset_url }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                    Отменить изменения
+                </a>
+            {% endif %}
+
             <button type="submit" class="btn btn-primary">
                 <i class="bi bi-save"></i> Сохранить
             </button>
-            
-            <a href="{% url 'admin_schedules' %}" class="btn btn-secondary">
+
+            <a href="{{ return_url }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Отмена
             </a>
         </form>
+
+        {% if schedule %}
+            <hr>
+
+            <form method="post"
+                  action="{% url 'admin_schedule_delete' schedule.id %}"
+                  onsubmit="return confirm('Удалить эту запись расписания?')">
+                {% csrf_token %}
+
+                <button type="submit" class="btn btn-outline-danger">
+                    <i class="bi bi-trash"></i> Удалить
+                </button>
+            </form>
+        {% endif %}
         
     </div>
 </div>

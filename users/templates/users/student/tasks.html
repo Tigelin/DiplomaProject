@@ -47,7 +47,7 @@
 
         <div class="alert alert-info">
             <i class="bi bi-info-circle"></i>
-            Найдено заданий: <strong>{{ tasks_with_status|length }}</strong>
+            Найдено заданий: <strong>{{ tasks_with_status.paginator.count }}</strong>
 
             {% if not show_all %}
 
@@ -89,15 +89,23 @@
                             <td>{{ item.task.lesson.schedule.discipline.teacher.user.get_full_name }}</td>
                             <td>{{ item.task.lesson.schedule.date|date:"d.m.Y" }}</td>
                             <td>
-                                <span class="badge
-                                    {% if item.grade == 5 %}bg-dark-green
-                                    {% elif item.grade == 4 %}bg-success
-                                    {% elif item.grade == 3 %}bg-warning text-dark
-                                    {% elif item.grade == 2 %}bg-danger
-                                    {% else %}bg-dark text-white
-                                    {% endif %}">
-                                    {{ item.grade }}
-                                </span>
+                                {% if item.grade == 1 %}
+
+                                    <span class="text-danger" title="Оценка: 1">●</span>
+
+                                {% else %}
+
+                                    <span class="badge
+                                        {% if item.grade == 5 %}bg-dark-green
+                                        {% elif item.grade == 4 %}bg-success
+                                        {% elif item.grade == 3 %}bg-warning text-dark
+                                        {% elif item.grade == 2 %}bg-danger
+                                        {% else %}bg-dark text-white
+                                        {% endif %}">
+                                        {{ item.grade }}
+                                    </span>
+
+                                {% endif %}
                             </td>
                             <td>
 
@@ -119,6 +127,63 @@
                 </tbody>
             </table>
         </div>
+
+        {% if tasks_with_status.has_other_pages %}
+
+            <nav aria-label="Навигация по страницам заданий" class="mt-3">
+                <ul class="pagination justify-content-center">
+
+                    {% if tasks_with_status.has_previous %}
+
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ tasks_with_status.previous_page_number }}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
+                            Назад
+                        </a>
+                    </li>
+
+                    {% endif %}
+
+                    {% for page_number in page_range %}
+
+                        {% if page_number == ellipsis %}
+
+                        <li class="page-item disabled">
+                            <span class="page-link">{{ page_number }}</span>
+                        </li>
+
+                        {% elif page_number == tasks_with_status.number %}
+
+                        <li class="page-item active" aria-current="page">
+                            <span class="page-link">{{ page_number }}</span>
+                        </li>
+
+                        {% else %}
+
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_number }}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
+                                {{ page_number }}
+                            </a>
+                        </li>
+
+                        {% endif %}
+
+                    {% endfor %}
+
+                    {% if tasks_with_status.has_next %}
+
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ tasks_with_status.next_page_number }}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
+                            Вперёд
+                        </a>
+                    </li>
+
+                    {% endif %}
+
+                </ul>
+            </nav>
+
+        {% endif %}
+
     </div>
 </div>
 
