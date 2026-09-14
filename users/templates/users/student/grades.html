@@ -54,15 +54,27 @@
 
                                                 {% for grade in grade_list %}
 
-                                                    <span class="badge
-                                                        {% if grade.value == 5 %}bg-dark-green
-                                                        {% elif grade.value == 4 %}bg-success
-                                                        {% elif grade.value == 3 %}bg-warning text-dark
-                                                        {% elif grade.value == 2 %}bg-danger
-                                                        {% else %}bg-dark text-white
-                                                        {% endif %} mb-1" style="cursor: pointer;" onclick="window.location.href='{% url 'lesson_detail' grade.task.lesson.id %}?from=grades'">
-                                                        {{ grade.value }}
-                                                    </span>
+                                                    {% if grade.value == 1 %}
+
+                                                        <span class="text-danger"
+                                                              title="Оценка: 1"
+                                                              style="cursor: pointer;"
+                                                              onclick="window.location.href='{% url 'lesson_detail' grade.task.lesson.id %}?from=grades'">●</span>
+
+                                                    {% else %}
+
+                                                        <span class="badge
+                                                            {% if grade.value == 5 %}bg-dark-green
+                                                            {% elif grade.value == 4 %}bg-success
+                                                            {% elif grade.value == 3 %}bg-warning text-dark
+                                                            {% elif grade.value == 2 %}bg-danger
+                                                            {% endif %} mb-1"
+                                                            style="cursor: pointer;"
+                                                            onclick="window.location.href='{% url 'lesson_detail' grade.task.lesson.id %}?from=grades'">
+                                                            {{ grade.value }}
+                                                        </span>
+
+                                                    {% endif %}
 
                                                     {% if not forloop.last %}<br>{% endif %}
 

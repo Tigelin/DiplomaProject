@@ -89,15 +89,23 @@
                             <td>{{ item.task.lesson.schedule.discipline.teacher.user.get_full_name }}</td>
                             <td>{{ item.task.lesson.schedule.date|date:"d.m.Y" }}</td>
                             <td>
-                                <span class="badge
-                                    {% if item.grade == 5 %}bg-dark-green
-                                    {% elif item.grade == 4 %}bg-success
-                                    {% elif item.grade == 3 %}bg-warning text-dark
-                                    {% elif item.grade == 2 %}bg-danger
-                                    {% else %}bg-dark text-white
-                                    {% endif %}">
-                                    {{ item.grade }}
-                                </span>
+                                {% if item.grade == 1 %}
+
+                                    <span class="text-danger" title="Оценка: 1">●</span>
+
+                                {% else %}
+
+                                    <span class="badge
+                                        {% if item.grade == 5 %}bg-dark-green
+                                        {% elif item.grade == 4 %}bg-success
+                                        {% elif item.grade == 3 %}bg-warning text-dark
+                                        {% elif item.grade == 2 %}bg-danger
+                                        {% else %}bg-dark text-white
+                                        {% endif %}">
+                                        {{ item.grade }}
+                                    </span>
+
+                                {% endif %}
                             </td>
                             <td>
 
