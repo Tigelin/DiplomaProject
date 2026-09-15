@@ -1,0 +1,148 @@
+{% extends "journal/base.html" %}
+{% load dict_extras %}
+
+{% block title %}Посещаемость занятия{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Личный кабинет</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'teacher_groups' %}">Мои группы</a></li>
+    <li class="breadcrumb-item">
+        <a href="{% url 'teacher_journal' schedule.discipline.id %}">Журнал оценок</a>
+    </li>
+    <li class="breadcrumb-item">
+        <a href="{% url 'teacher_lesson' schedule.id %}">Занятие</a>
+    </li>
+    <li class="breadcrumb-item active">Посещаемость</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-person-check"></i> Посещаемость занятия
+        </h4>
+    </div>
+    <div class="card-body">
+
+        <div class="alert alert-info">
+            <strong>Дисциплина:</strong> {{ schedule.discipline.plan.name }}<br>
+            <strong>Группа:</strong> {{ schedule.discipline.group.name }}<br>
+            <strong>Дата занятия:</strong> {{ schedule.date|date:"d.m.Y" }}<br>
+            <strong>Тема занятия:</strong> {{ lesson.topic|default:"—" }}
+        </div>
+
+        {% if students %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="table-responsive mt-3">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Студент</th>
+
+                                <th class="text-center">Посещаемость</th>
+
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                            {% for student in students %}
+
+                                {% with current_type=attendance_statuses|get_by_key:student.id %}
+
+                                    <tr>
+                                        <td>
+                                            {{ student.user.last_name }}
+                                            {{ student.user.first_name }}
+                                            {{ student.user.patronymic }}
+                                        </td>
+
+                                        <td>
+                                            <div class="d-flex flex-wrap justify-content-center gap-2">
+
+                                                {% for attendance_type in attendance_types %}
+
+                                                    <input type="radio"
+                                                           name="attendance_{{ student.id }}"
+                                                           value="{{ attendance_type.id }}"
+                                                           id="attendance_{{ student.id }}_{{ attendance_type.id }}"
+                                                           class="btn-check"
+                                                           autocomplete="off"
+                                                           aria-label="{{ attendance_type.name }} — {{ student.user.last_name }} {{ student.user.first_name }}"
+                                                           {% if current_type == attendance_type.id %}checked{% endif %}
+                                                           required>
+
+                                                    <label for="attendance_{{ student.id }}_{{ attendance_type.id }}"
+                                                           class="attendance-option
+                                                               {% if attendance_type.name == 'Присутствовал' %}attendance-present
+                                                               {% elif attendance_type.name == 'Опоздал' %}attendance-late
+                                                               {% elif attendance_type.name == 'Отсутствовал по болезни' %}attendance-sick
+                                                               {% elif attendance_type.name == 'Отсутствовал по уважительной причине' %}attendance-excused
+                                                               {% elif attendance_type.name == 'Отсутствовал без причины' %}attendance-absent
+                                                               {% endif %}"
+                                                           title="{{ attendance_type.name }}">
+
+                                                        {% if attendance_type.name == 'Присутствовал' %}✓
+                                                        {% elif attendance_type.name == 'Опоздал' %}О
+                                                        {% elif attendance_type.name == 'Отсутствовал по болезни' %}Б
+                                                        {% elif attendance_type.name == 'Отсутствовал по уважительной причине' %}УП
+                                                        {% elif attendance_type.name == 'Отсутствовал без причины' %}НП
+                                                        {% else %}{{ attendance_type.name }}
+                                                        {% endif %}
+
+                                                    </label>
+
+                                                {% endfor %}
+
+                                            </div>
+                                        </td>
+
+                                    </tr>
+
+                                {% endwith %}
+
+                            {% endfor %}
+
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="small text-muted mt-2">
+                    <span class="text-success fw-bold">✓</span> — присутствовал;
+                    <span class="text-warning fw-bold">О</span> — опоздал;
+                    <span class="text-primary fw-bold">Б</span> — отсутствовал по болезни;
+                    <span class="text-orange fw-bold">УП</span> — отсутствовал по уважительной причине;
+                    <span class="text-danger fw-bold">НП</span> — отсутствовал без причины.
+                </div>
+
+                <button type="submit" class="btn btn-success mt-3">
+                    <i class="bi bi-check-circle"></i> Сохранить посещаемость
+                </button>
+
+                <a href="{% url 'teacher_lesson' schedule.id %}" class="btn btn-secondary mt-3">
+                    <i class="bi bi-arrow-left"></i> Назад к занятию
+                </a>
+            </form>
+
+        {% else %}
+
+            <div class="alert alert-secondary">
+                В группе нет студентов.
+            </div>
+
+            <a href="{% url 'teacher_lesson' schedule.id %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Назад к занятию
+            </a>
+
+        {% endif %}
+
+    </div>
+</div>
+
+{% endblock %}

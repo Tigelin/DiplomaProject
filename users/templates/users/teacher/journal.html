@@ -57,7 +57,11 @@
                             {% for schedule in schedules %}
                                 {% if schedule.has_lesson %}
                                     <th class="lesson-start" style="min-width: 60px; vertical-align: middle; font-weight: normal;">
-                                        <span class="text-white">Пос.</span>
+                                        <a href="{% url 'teacher_lesson_attendance' schedule.lesson.id %}"
+                                           class="text-white text-decoration-none d-block"
+                                           title="Открыть посещаемость занятия">
+                                            Пос.
+                                        </a>
                                     </th>
                                 {% endif %}
 
