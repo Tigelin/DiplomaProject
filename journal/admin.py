@@ -3,7 +3,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from .models import (
     Department, Group, Teacher, Student, DisciplinePlan, Discipline,
-    Classroom, Schedule, Lesson, LessonType, Task, LessonFile,
+    Classroom, Schedule, Lesson, LessonType, TaskType, Task, LessonFile,
     Grade, Attendance, AttendanceType, ContactMessage, MessageStatus,
     Specialty
 )
@@ -203,18 +203,37 @@ class LessonTypeAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
         }
 
 
-@admin.register(Task)
-class TaskAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
-    list_display = ('id', 'name', 'lesson')
-    list_filter = ('lesson__schedule__discipline__group',)
-    search_fields = ('name',)
+@admin.register(TaskType)
+class TaskTypeAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
+    list_display = ('id', 'name', 'abbreviation')
+    search_fields = ('name', 'abbreviation')
 
     def get_add_url_with_data(self, request, obj):
-        return f"{reverse('admin:journal_task_add')}?name={obj.name}&lesson={obj.lesson.id}"
+        return (
+            f"{reverse('admin:journal_tasktype_add')}"
+            f"?name={obj.name}&abbreviation={obj.abbreviation}"
+        )
 
     def get_changeform_initial_data(self, request):
         return {
             'name': request.GET.get('name'),
+            'abbreviation': request.GET.get('abbreviation'),
+        }
+
+
+@admin.register(Task)
+class TaskAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
+    list_display = ('id', 'name', 'task_type', 'lesson')
+    list_filter = ('task_type', 'lesson__schedule__discipline__group')
+    search_fields = ('name', 'task_type__name', 'task_type__abbreviation')
+
+    def get_add_url_with_data(self, request, obj):
+        return f"{reverse('admin:journal_task_add')}?name={obj.name}&task_type={obj.task_type.id}&lesson={obj.lesson.id}"
+
+    def get_changeform_initial_data(self, request):
+        return {
+            'name': request.GET.get('name'),
+            'task_type': request.GET.get('task_type'),
             'lesson': request.GET.get('lesson'),
         }
 

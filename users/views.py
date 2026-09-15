@@ -15,7 +15,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Q, Sum
 from journal.models import (
-    Grade, Task, Discipline, Lesson, LessonFile, Attendance,
+    Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
     Teacher, Classroom
 )
@@ -438,7 +438,11 @@ def teacher_journal(request, discipline_id):
         if schedule.has_lesson:
             schedule.lesson = lesson
             schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
-            schedule.tasks = Task.objects.filter(lesson=lesson)
+            schedule.tasks = (
+                Task.objects
+                .filter(lesson=lesson)
+                .select_related('task_type')
+            )
         else:
             schedule.lesson_type = None
             schedule.tasks = []
@@ -528,8 +532,21 @@ def teacher_lesson(request, schedule_id):
 
         elif 'add_task' in request.POST:
             if lesson:
+                task_type_id = request.POST.get('task_type', '')
+
+                if not task_type_id.isdigit():
+                    messages.error(request, 'Выберите тип задания.')
+                    return redirect('teacher_lesson', schedule_id=schedule.id)
+
+                task_type = TaskType.objects.filter(id=task_type_id).first()
+
+                if not task_type:
+                    messages.error(request, 'Выбранный тип задания не найден.')
+                    return redirect('teacher_lesson', schedule_id=schedule.id)
+
                 Task.objects.create(
                     name=request.POST.get('task_name'),
+                    task_type=task_type,
                     lesson=lesson,
                     description=request.POST.get('task_description', '')
                 )
@@ -563,7 +580,13 @@ def teacher_lesson(request, schedule_id):
 
     lesson_types = LessonType.objects.all()
     files = LessonFile.objects.filter(lesson=lesson) if lesson else []
-    tasks = Task.objects.filter(lesson=lesson) if lesson else []
+    task_types = TaskType.objects.order_by('name')
+    tasks = (
+        Task.objects
+        .filter(lesson=lesson)
+        .select_related('task_type')
+        if lesson else []
+    )
 
     context = {
         'teacher': teacher,
@@ -573,6 +596,7 @@ def teacher_lesson(request, schedule_id):
         'lesson_types': lesson_types,
         'files': files,
         'tasks': tasks,
+        'task_types': task_types,
         'upload_form': upload_form,
     }
     return render(request, 'users/teacher/lesson.html', context)
@@ -677,7 +701,7 @@ def teacher_task_grades(request, task_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    task = get_object_or_404(Task, id=task_id)
+    task = get_object_or_404(Task.objects.select_related('task_type'), id=task_id)
     lesson = task.lesson
     schedule = lesson.schedule
 
@@ -710,9 +734,23 @@ def teacher_task_grades(request, task_id):
             return redirect('teacher_journal', discipline_id=schedule.discipline.id)
 
         elif 'save_task' in request.POST:
+            task_type_id = request.POST.get('task_type', '')
+
+            if not task_type_id.isdigit():
+                messages.error(request, 'Выберите тип задания.')
+                return redirect('teacher_task_grades', task_id=task.id)
+
+            task_type = TaskType.objects.filter(id=task_type_id).first()
+
+            if not task_type:
+                messages.error(request, 'Выбранный тип задания не найден.')
+                return redirect('teacher_task_grades', task_id=task.id)
+
+            task.task_type = task_type
             task.name = request.POST.get('task_name')
             task.description = request.POST.get('task_description', '')
             task.save()
+
             messages.success(request, 'Задание сохранено.')
             return redirect('teacher_task_grades', task_id=task.id)
 
@@ -781,6 +819,8 @@ def teacher_task_grades(request, task_id):
         ).values_list('id', flat=True)
     )
 
+    task_types = TaskType.objects.order_by('name')
+
     context = {
         'teacher': teacher,
         'task': task,
@@ -790,7 +830,9 @@ def teacher_task_grades(request, task_id):
         'grades': grades,
         'attendance_statuses': attendance_statuses,
         'required_student_ids': required_student_ids,
+        'task_types': task_types,
     }
+
     return render(request, 'users/teacher/task_grades.html', context)
 
 
@@ -808,7 +850,23 @@ def teacher_task_create(request, lesson_id):
         messages.error(request, 'У вас нет доступа.')
         return redirect('teacher_groups')
 
-    task = Task.objects.create(lesson=lesson, name='Новое задание')
+    task_type = TaskType.objects.order_by('id').first()
+
+    if not task_type:
+        messages.error(
+            request,
+            'В справочнике нет ни одного типа задания.'
+        )
+        return redirect(
+            'teacher_journal',
+            discipline_id=lesson.schedule.discipline.id
+        )
+
+    task = Task.objects.create(
+        lesson=lesson,
+        task_type=task_type,
+        name='Новое задание'
+    )
 
     return redirect('teacher_task_grades', task_id=task.id)
 
@@ -839,7 +897,7 @@ def export_journal_excel(request, discipline_id):
         if schedule.has_lesson:
             schedule.lesson = lesson
             schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
-            schedule.tasks = Task.objects.filter(lesson=lesson)
+            schedule.tasks = Task.objects.filter(lesson=lesson).select_related('task_type')
             schedule.topic = lesson.topic if lesson.topic else '—'
         else:
             schedule.lesson_type = None
@@ -942,7 +1000,7 @@ def export_journal_excel(request, discipline_id):
     for schedule in schedules:
         if schedule.has_lesson and schedule.tasks:
             for task in schedule.tasks:
-                ws.cell(row=second_header_row, column=col).value = task.name
+                ws.cell(row=second_header_row, column=col).value = f"{task.task_type.abbreviation} — {task.name}"
                 ws.cell(row=second_header_row, column=col).fill = header_fill
                 ws.cell(row=second_header_row, column=col).font = header_font
                 ws.cell(row=second_header_row, column=col).alignment = center_alignment
@@ -1034,7 +1092,7 @@ def export_journal_docx(request, discipline_id):
         if schedule.has_lesson:
             schedule.lesson = lesson
             schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
-            schedule.tasks = Task.objects.filter(lesson=lesson)
+            schedule.tasks = Task.objects.filter(lesson=lesson).select_related('task_type')
             schedule.topic = lesson.topic if lesson.topic else '—'
         else:
             schedule.lesson_type = None
@@ -1105,7 +1163,7 @@ def export_journal_docx(request, discipline_id):
     for schedule in schedules:
         if schedule.has_lesson and schedule.tasks:
             for task in schedule.tasks:
-                table.cell(1, col).text = task.name
+                table.cell(1, col).text = f"{task.task_type.abbreviation} — {task.name}"
                 col += 1
         elif schedule.has_lesson:
             col += 1

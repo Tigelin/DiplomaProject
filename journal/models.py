@@ -56,6 +56,18 @@ class LessonType(models.Model):
         verbose_name_plural = "Типы занятий"
 
 
+class TaskType(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name="Название типа")
+    abbreviation = models.CharField(max_length=10, unique=True, verbose_name="Аббревиатура")
+
+    def __str__(self):
+        return f"{self.name} ({self.abbreviation})"
+
+    class Meta:
+        verbose_name = "Тип задания"
+        verbose_name_plural = "Типы заданий"
+
+
 class AttendanceType(models.Model):
     name = models.CharField(max_length=50, verbose_name="Тип присутствия")
 
@@ -170,6 +182,7 @@ class Lesson(models.Model):
 
 
 class Task(models.Model):
+    task_type = models.ForeignKey(TaskType, on_delete=models.PROTECT, verbose_name="Тип задания")
     name = models.CharField(max_length=200, verbose_name="Название задания")
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='tasks', verbose_name="Занятие")
     description = models.TextField(blank=True, verbose_name="Описание задания")

@@ -95,10 +95,20 @@
                 {% csrf_token %}
 
                 <div class="row">
-                    <div class="col-md-5">
+                    <div class="col-md-3">
+                        <select name="task_type" class="form-select" required>
+                            <option value="">Тип задания</option>
+                            {% for task_type in task_types %}
+                                <option value="{{ task_type.id }}">
+                                    {{ task_type }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
                         <input type="text" name="task_name" class="form-control" placeholder="Название задания" required>
                     </div>
-                    <div class="col-md-5">
+                    <div class="col-md-3">
                         <input type="text" name="task_description" class="form-control" placeholder="Описание (необязательно)">
                     </div>
                     <div class="col-md-2">
@@ -115,6 +125,7 @@
                     <table class="table table-striped">
                         <thead class="table-dark">
                             <tr>
+                                <th>Тип</th>
                                 <th>Название</th>
                                 <th>Описание</th>
                                 <th>Действия</th>
@@ -124,6 +135,7 @@
 
                             {% for task in tasks %}
                                 <tr>
+                                    <td>{{ task.task_type }}</td>
                                     <td>{{ task.name }}</td>
                                     <td>{{ task.description|default:"—" }}</td>
                                     <td>

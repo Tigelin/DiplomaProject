@@ -67,13 +67,15 @@
 
                                 {% if schedule.has_lesson and schedule.tasks %}
                                     {% for task in schedule.tasks %}
-                                        <th style="min-width: 80px; vertical-align: top; font-weight: normal; cursor: pointer;" onclick="window.location.href='{% url 'teacher_task_grades' task.id %}'">
-                                            <span class="text-white">{{ task.name }}</span>
+                                        <th style="min-width: 80px; vertical-align: middle; font-weight: normal; cursor: pointer;"
+                                            title="{{ task.task_type.name }} — {{ task.name }}"
+                                            onclick="window.location.href='{% url 'teacher_task_grades' task.id %}'">
+                                            <span class="text-white">{{ task.task_type.abbreviation }}</span>
                                         </th>
                                     {% endfor %}
                                 {% elif schedule.has_lesson %}
                                     <th style="min-width: 80px; vertical-align: top; font-weight: normal; cursor: pointer;" onclick="window.location.href='{% url 'teacher_task_create' schedule.lesson.id %}'">
-                                        <span class="text-white-50">+ добавить задание</span>
+                                        <span class="text-white-50">+ задание</span>
                                     </th>
                                 {% else %}
                                     <th class="lesson-start" style="min-width: 80px; vertical-align: top; font-weight: normal; opacity: 0.3;">
