@@ -16,6 +16,7 @@ urlpatterns = [
     path('teacher/groups/', views.teacher_groups, name='teacher_groups'),
     path('teacher/journal/<int:discipline_id>/', views.teacher_journal, name='teacher_journal'),
     path('teacher/lesson/<int:schedule_id>/', views.teacher_lesson, name='teacher_lesson'),
+    path('teacher/lesson/<int:lesson_id>/attendance/', views.teacher_lesson_attendance, name='teacher_lesson_attendance'),
     path('teacher/task/<int:task_id>/', views.teacher_task_grades, name='teacher_task_grades'),
     path('teacher/task/create/<int:lesson_id>/', views.teacher_task_create, name='teacher_task_create'),
     path('teacher/journal/export/<int:discipline_id>/', views.export_journal_excel, name='export_journal_excel'),

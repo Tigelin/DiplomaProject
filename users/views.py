@@ -22,6 +22,7 @@ from journal.models import (
 from .forms import LessonFileUploadForm
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.db import transaction
 
 # Create your views here.
 
@@ -514,10 +515,6 @@ def teacher_lesson(request, schedule_id):
         if 'save_lesson' in request.POST:
             if not lesson:
                 lesson = Lesson.objects.create(schedule=schedule, hours=2)
-                students = Student.objects.filter(group=schedule.discipline.group)
-                attendance_type, _ = AttendanceType.objects.get_or_create(name='Присутствовал')
-                for student in students:
-                    Attendance.objects.create(lesson=lesson, student=student, attendance_type=attendance_type)
 
             lesson.topic = request.POST.get('topic', '')
             lesson_type_id = request.POST.get('lesson_type')
@@ -579,6 +576,97 @@ def teacher_lesson(request, schedule_id):
         'upload_form': upload_form,
     }
     return render(request, 'users/teacher/lesson.html', context)
+
+
+@login_required
+def teacher_lesson_attendance(request, lesson_id):
+    try:
+        teacher = request.user.teacher
+    except:
+        messages.error(request, 'Профиль преподавателя не найден.')
+        return redirect('home')
+
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+    schedule = lesson.schedule
+
+    if schedule.discipline.teacher != teacher:
+        messages.error(request, 'У вас нет доступа к этому занятию.')
+        return redirect('teacher_groups')
+
+    students = Student.objects.filter(
+        group=schedule.discipline.group
+    ).select_related('user').order_by('user__last_name')
+
+    attendance_types = AttendanceType.objects.all().order_by('id')
+    attendance_types_by_id = {
+        str(attendance_type.id): attendance_type
+        for attendance_type in attendance_types
+    }
+
+    present_type = attendance_types.filter(name='Присутствовал').first()
+
+    if not present_type:
+        messages.error(request, 'Тип посещаемости «Присутствовал» не найден.')
+        return redirect('teacher_lesson', schedule_id=schedule.id)
+
+    attendance_statuses = {
+        student.id: present_type.id
+        for student in students
+    }
+
+    attendances = Attendance.objects.filter(
+        lesson=lesson,
+        student__in=students,
+        attendance_type__isnull=False
+    )
+
+    for attendance in attendances:
+        if str(attendance.attendance_type_id) in attendance_types_by_id:
+            attendance_statuses[attendance.student_id] = attendance.attendance_type_id
+
+    if request.method == 'POST':
+        submitted_statuses = {}
+
+        for student in students:
+            attendance_type_id = request.POST.get(f'attendance_{student.id}')
+
+            if attendance_type_id not in attendance_types_by_id:
+                messages.error(request, 'Выберите статус посещаемости для каждого студента.')
+                break
+
+            submitted_statuses[student.id] = attendance_type_id
+            attendance_statuses[student.id] = int(attendance_type_id)
+        else:
+            with transaction.atomic():
+                for student in students:
+                    attendance_type = attendance_types_by_id[
+                        submitted_statuses[student.id]
+                    ]
+
+                    if attendance_type.id == present_type.id:
+                        Attendance.objects.filter(
+                            lesson=lesson,
+                            student=student
+                        ).delete()
+                    else:
+                        Attendance.objects.update_or_create(
+                            lesson=lesson,
+                            student=student,
+                            defaults={'attendance_type': attendance_type}
+                        )
+
+            messages.success(request, 'Посещаемость сохранена.')
+            return redirect('teacher_lesson_attendance', lesson_id=lesson.id)
+
+    context = {
+        'teacher': teacher,
+        'lesson': lesson,
+        'schedule': schedule,
+        'students': students,
+        'attendance_types': attendance_types,
+        'attendance_statuses': attendance_statuses,
+    }
+    return render(request, 'users/teacher/lesson_attendance.html', context)
 
 
 @login_required
