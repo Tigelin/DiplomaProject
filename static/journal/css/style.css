@@ -112,3 +112,9 @@
     outline: 3px solid rgba(13, 110, 253, 0.35);
     outline-offset: 2px;
 }
+
+.grade-input::placeholder {
+    color: #dc3545;
+    opacity: 1;
+    font-weight: bold;
+}

@@ -685,8 +685,23 @@ def teacher_task_grades(request, task_id):
         messages.error(request, 'У вас нет доступа к этому заданию.')
         return redirect('teacher_groups')
 
-    students = Student.objects.filter(group=schedule.discipline.group).select_related('user').order_by(
-        'user__last_name')
+    students = list(Student.objects.filter(
+        group=schedule.discipline.group
+    ).select_related('user').order_by('user__last_name'))
+
+    attendance_statuses = {
+        student.id: 'Присутствовал'
+        for student in students
+    }
+
+    attendances = Attendance.objects.filter(
+        lesson=lesson,
+        student__in=students,
+        attendance_type__isnull=False
+    ).select_related('attendance_type')
+
+    for attendance in attendances:
+        attendance_statuses[attendance.student_id] = attendance.attendance_type.name
 
     if request.method == 'POST':
         if 'delete_task' in request.POST:
@@ -702,23 +717,69 @@ def teacher_task_grades(request, task_id):
             return redirect('teacher_task_grades', task_id=task.id)
 
         elif 'save_grades' in request.POST:
+            submitted_grades = {}
+            submitted_required_student_ids = set()
+
             for student in students:
-                grade_value = request.POST.get(f'grade_{student.id}')
-                if grade_value and grade_value.isdigit() and 1 <= int(grade_value) <= 5:
-                    Grade.objects.update_or_create(
-                        task=task,
-                        student=student,
-                        defaults={'value': int(grade_value)}
-                    )
-                elif grade_value == '':
-                    Grade.objects.filter(task=task, student=student).delete()
+                grade_value = request.POST.get(f'grade_{student.id}', '').strip()
+
+                if f'required_{student.id}' in request.POST:
+                    submitted_required_student_ids.add(student.id)
+
+                if grade_value:
+                    if not grade_value.isdigit() or not 2 <= int(grade_value) <= 5:
+                        messages.error(
+                            request,
+                            'Оценка должна быть целым числом от 2 до 5.'
+                        )
+                        return redirect('teacher_task_grades', task_id=task.id)
+
+                    submitted_grades[student.id] = int(grade_value)
+
+            with transaction.atomic():
+                task.required_students.set(submitted_required_student_ids)
+
+                for student in students:
+                    grade_value = submitted_grades.get(student.id)
+
+                    if grade_value is not None:
+                        Grade.objects.update_or_create(
+                            task=task,
+                            student=student,
+                            defaults={'value': grade_value}
+                        )
+
+                    elif student.id in submitted_required_student_ids:
+                        Grade.objects.update_or_create(
+                            task=task,
+                            student=student,
+                            defaults={'value': 1}
+                        )
+
+                    else:
+                        Grade.objects.filter(
+                            task=task,
+                            student=student
+                        ).delete()
+
             messages.success(request, 'Оценки сохранены.')
+
             return redirect('teacher_task_grades', task_id=task.id)
 
-    grades = {}
-    for student in students:
-        grade = Grade.objects.filter(task=task, student=student).first()
-        grades[student.id] = grade.value if grade else None
+    grades = {
+        student.id: None
+        for student in students
+    }
+
+    for grade in Grade.objects.filter(task=task, student__in=students):
+        if 2 <= grade.value <= 5:
+            grades[grade.student_id] = grade.value
+
+    required_student_ids = set(
+        task.required_students.filter(
+            group=schedule.discipline.group
+        ).values_list('id', flat=True)
+    )
 
     context = {
         'teacher': teacher,
@@ -727,6 +788,8 @@ def teacher_task_grades(request, task_id):
         'schedule': schedule,
         'students': students,
         'grades': grades,
+        'attendance_statuses': attendance_statuses,
+        'required_student_ids': required_student_ids,
     }
     return render(request, 'users/teacher/task_grades.html', context)
 
