@@ -66,21 +66,38 @@
 
             <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
                 <div class="btn-group" role="group" aria-label="Настройка обязательности задания">
-                    <button type="button"
-                            class="btn btn-outline-secondary"
-                            data-required-action="none">
+                    <input type="radio"
+                           class="btn-check"
+                           name="required_action"
+                           id="required_none"
+                           autocomplete="off">
+                    <label class="btn btn-outline-secondary"
+                           for="required_none"
+                           data-required-action="none">
                         Не обязательно
-                    </button>
-                    <button type="button"
-                            class="btn btn-outline-primary"
-                            data-required-action="present">
+                    </label>
+
+                    <input type="radio"
+                           class="btn-check"
+                           name="required_action"
+                           id="required_present"
+                           autocomplete="off">
+                    <label class="btn btn-outline-primary"
+                           for="required_present"
+                           data-required-action="present">
                         Обязательно для присутствующих
-                    </button>
-                    <button type="button"
-                            class="btn btn-outline-primary"
-                            data-required-action="all">
+                    </label>
+
+                    <input type="radio"
+                           class="btn-check"
+                           name="required_action"
+                           id="required_all"
+                           autocomplete="off">
+                    <label class="btn btn-outline-primary"
+                           for="required_all"
+                           data-required-action="all">
                         Обязательно для всех
-                    </button>
+                    </label>
                 </div>
 
                 <div class="form-check form-switch ms-md-auto">
