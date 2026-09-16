@@ -3,6 +3,7 @@ from django.db import models
 # Create your models here.
 from django.db import models
 from users.models import User
+from django.core.exceptions import ValidationError
 
 
 class Department(models.Model):
@@ -23,6 +24,7 @@ class Specialty(models.Model):
     qualification = models.CharField(max_length=200, verbose_name="Квалификация", blank=True)
     description = models.TextField(verbose_name="Описание", blank=True)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, verbose_name="Отделение")
+    duration_semesters = models.PositiveSmallIntegerField(default=8, verbose_name="Продолжительность обучения в семестрах")
 
     def __str__(self):
         return f"{self.name} ({self.code})" if self.code else self.name
@@ -32,10 +34,52 @@ class Specialty(models.Model):
         verbose_name_plural = "Специальности"
 
 
+class GroupNumberSet(models.Model):
+    name = models.CharField(max_length=100, verbose_name="Название комплекта")
+    specialty = models.ForeignKey(Specialty, on_delete=models.CASCADE, verbose_name="Специальность")
+
+    def __str__(self):
+        return f"{self.name} ({self.specialty})"
+
+    class Meta:
+        verbose_name = "Комплект номеров групп"
+        verbose_name_plural = "Комплекты номеров групп"
+        unique_together = ['name', 'specialty']
+
+
+class GroupNumberEntry(models.Model):
+    number_set = models.ForeignKey(GroupNumberSet, on_delete=models.CASCADE, related_name='entries', verbose_name="Комплект")
+    course = models.PositiveSmallIntegerField(verbose_name="Курс")
+    name = models.CharField(max_length=50, verbose_name="Номер группы")
+
+    def __str__(self):
+        return f"{self.course} курс — {self.name}"
+
+    class Meta:
+        verbose_name = "Номер группы по курсу"
+        verbose_name_plural = "Номера групп по курсам"
+        unique_together = ['number_set', 'course']
+
+
 class Group(models.Model):
     name = models.CharField(max_length=50, verbose_name="Номер группы")
     year = models.IntegerField(verbose_name="Год поступления")
     specialty = models.ForeignKey(Specialty, on_delete=models.CASCADE, verbose_name="Специальность")
+    is_graduated = models.BooleanField(default=False, verbose_name="Обучение завершено")
+    number_set = models.ForeignKey(GroupNumberSet, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Комплект номеров")
+
+    def get_study_semester(self, semester):
+        return (semester.start_year - self.year) * 2 + semester.number
+
+    def get_course(self, semester):
+        return (self.get_study_semester(semester) + 1) // 2
+
+    def get_display_name(self, semester):
+        if not self.number_set:
+            return self.name
+
+        entry = self.number_set.entries.filter(course=self.get_course(semester)).first()
+        return entry.name if entry else self.name
 
     def __str__(self):
         return f"{self.name} ({self.year})"
@@ -105,6 +149,7 @@ class Classroom(models.Model):
 class DisciplinePlan(models.Model):
     name = models.CharField(max_length=200, verbose_name="Название дисциплины")
     total_hours = models.IntegerField(verbose_name="Общее количество часов")
+    is_approved = models.BooleanField(default=False, verbose_name="Утверждён")
 
     def __str__(self):
         return self.name
@@ -112,6 +157,20 @@ class DisciplinePlan(models.Model):
     class Meta:
         verbose_name = "План дисциплины"
         verbose_name_plural = "Планы дисциплин"
+
+
+class SpecialtyCurriculumItem(models.Model):
+    specialty = models.ForeignKey(Specialty, on_delete=models.CASCADE, verbose_name="Специальность")
+    study_semester = models.PositiveSmallIntegerField(verbose_name="Семестр обучения")
+    plan = models.ForeignKey(DisciplinePlan, on_delete=models.PROTECT, limit_choices_to={'is_approved': True}, verbose_name="План дисциплины")
+
+    def __str__(self):
+        return f"{self.specialty} — {self.study_semester} семестр — {self.plan}"
+
+    class Meta:
+        verbose_name = "Дисциплина учебного плана специальности"
+        verbose_name_plural = "Дисциплины учебных планов специальностей"
+        unique_together = ['specialty', 'study_semester', 'plan']
 
 
 class Teacher(models.Model):
@@ -138,10 +197,113 @@ class Student(models.Model):
         verbose_name_plural = "Студенты"
 
 
+class StudentGroupMembership(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='group_memberships', verbose_name="Студент")
+    group = models.ForeignKey(Group, on_delete=models.PROTECT, verbose_name="Группа")
+    start_date = models.DateField(verbose_name="Дата начала")
+    end_date = models.DateField(null=True, blank=True, verbose_name="Дата окончания")
+
+    def clean(self):
+        super().clean()
+
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError({
+                'end_date': 'Дата окончания должна быть не раньше даты начала.'
+            })
+
+        if self.student_id and self.start_date:
+            memberships = StudentGroupMembership.objects.filter(student_id=self.student_id).exclude(pk=self.pk)
+
+            if self.end_date:
+                memberships = memberships.filter(start_date__lte=self.end_date)
+
+            memberships = memberships.filter(
+                models.Q(end_date__isnull=True) |
+                models.Q(end_date__gte=self.start_date)
+            )
+
+            if memberships.exists():
+                raise ValidationError(
+                    'Период обучения пересекается с другой группой студента.'
+                )
+
+    def __str__(self):
+        return f"{self.student} — {self.group}"
+
+    class Meta:
+        verbose_name = "История группы студента"
+        verbose_name_plural = "История групп студентов"
+        unique_together = ['student', 'start_date']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(end_date__isnull=True) | models.Q(end_date__gte=models.F('start_date')),
+                name='student_membership_dates_order',
+            ),
+        ]
+
+
+class AcademicSemesterStatus(models.Model):
+    code = models.CharField(max_length=20, unique=True, verbose_name="Код")
+    name = models.CharField(max_length=50, unique=True, verbose_name="Название")
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Статус учебного семестра"
+        verbose_name_plural = "Статусы учебных семестров"
+
+
+class AcademicSemester(models.Model):
+    start_year = models.PositiveIntegerField(verbose_name="Год начала учебного года")
+    is_first_semester = models.BooleanField(default=True, verbose_name="Первый семестр")
+    start_date = models.DateField(verbose_name="Дата начала")
+    end_date = models.DateField(verbose_name="Дата окончания")
+    status = models.ForeignKey(AcademicSemesterStatus, on_delete=models.PROTECT, verbose_name="Статус")
+
+    @property
+    def number(self):
+        return 1 if self.is_first_semester else 2
+
+    def clean(self):
+        super().clean()
+
+        if self.start_date and self.end_date:
+            if self.start_date > self.end_date:
+                raise ValidationError({
+                    'end_date': 'Дата окончания должна быть не раньше даты начала.'
+                })
+
+            overlapping_semesters = AcademicSemester.objects.exclude(pk=self.pk).filter(
+                start_date__lte=self.end_date,
+                end_date__gte=self.start_date,
+            )
+            if overlapping_semesters.exists():
+                raise ValidationError(
+                    'Период пересекается с другим учебным семестром.'
+                )
+
+    def __str__(self):
+        return f"{self.start_year}/{self.start_year + 1}, {self.number} семестр"
+
+    class Meta:
+        verbose_name = "Учебный семестр"
+        verbose_name_plural = "Учебные семестры"
+        unique_together = ['start_year', 'is_first_semester']
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(start_date__lte=models.F('end_date')),
+                name='academic_semester_dates_order',
+            ),
+        ]
+
+
 class Discipline(models.Model):
     plan = models.ForeignKey(DisciplinePlan, on_delete=models.CASCADE, verbose_name="План дисциплины")
     group = models.ForeignKey(Group, on_delete=models.CASCADE, verbose_name="Группа")
-    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, verbose_name="Преподаватель")
+    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Преподаватель")
+    semester = models.ForeignKey(AcademicSemester, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Учебный семестр")
+    is_confirmed = models.BooleanField(default=False, verbose_name="Подтверждена")
 
     def __str__(self):
         return f"{self.plan.name} - {self.group.name}"
@@ -149,7 +311,7 @@ class Discipline(models.Model):
     class Meta:
         verbose_name = "Дисциплина"
         verbose_name_plural = "Дисциплины"
-        unique_together = ['plan', 'group', 'teacher']
+        unique_together = ['plan', 'group', 'semester']
 
 
 class Schedule(models.Model):
