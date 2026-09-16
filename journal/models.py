@@ -66,7 +66,7 @@ class Group(models.Model):
     year = models.IntegerField(verbose_name="Год поступления")
     specialty = models.ForeignKey(Specialty, on_delete=models.CASCADE, verbose_name="Специальность")
     is_graduated = models.BooleanField(default=False, verbose_name="Обучение завершено")
-    number_set = models.ForeignKey(GroupNumberSet, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Комплект номеров")
+    number_set = models.ForeignKey(GroupNumberSet, on_delete=models.PROTECT, verbose_name="Комплект номеров")
 
     def get_study_semester(self, semester):
         return (semester.start_year - self.year) * 2 + semester.number
@@ -302,7 +302,7 @@ class Discipline(models.Model):
     plan = models.ForeignKey(DisciplinePlan, on_delete=models.CASCADE, verbose_name="План дисциплины")
     group = models.ForeignKey(Group, on_delete=models.CASCADE, verbose_name="Группа")
     teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, null=True, blank=True, verbose_name="Преподаватель")
-    semester = models.ForeignKey(AcademicSemester, on_delete=models.PROTECT, null=True, blank=True, verbose_name="Учебный семестр")
+    semester = models.ForeignKey(AcademicSemester, on_delete=models.PROTECT, verbose_name="Учебный семестр")
     is_confirmed = models.BooleanField(default=False, verbose_name="Подтверждена")
 
     def __str__(self):
