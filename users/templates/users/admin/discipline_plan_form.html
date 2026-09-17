@@ -38,6 +38,13 @@
                 <label class="form-label">Количество часов</label>
                 <input type="number" name="total_hours" class="form-control" value="{{ plan.total_hours }}" min="1" required>
             </div>
+
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" name="is_approved" id="isApproved" {% if plan.is_approved %}checked{% endif %}>
+                <label class="form-check-label" for="isApproved">
+                    Утверждён
+                </label>
+            </div>
             
             <button type="submit" class="btn btn-primary">
                 <i class="bi bi-save"></i> Сохранить

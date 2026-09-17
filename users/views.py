@@ -1471,7 +1471,11 @@ def admin_schedule_delete(request, schedule_id):
 
 @staff_member_required
 def admin_discipline_plans(request):
+    show_archived = request.GET.get('show_archived') == '1'
     plans = DisciplinePlan.objects.all().order_by('name')
+
+    if not show_archived:
+        plans = plans.filter(is_archived=False)
 
     search = request.GET.get('search', '')
     if search:
@@ -1491,6 +1495,7 @@ def admin_discipline_plans(request):
         'search': search,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'show_archived': show_archived,
     }
     return render(request, 'users/admin/discipline_plans.html', context)
 
@@ -1500,10 +1505,12 @@ def admin_discipline_plan_create(request):
     if request.method == 'POST':
         name = request.POST.get('name')
         total_hours = request.POST.get('total_hours')
+        is_approved = request.POST.get('is_approved') == 'on'
 
         DisciplinePlan.objects.create(
             name=name,
-            total_hours=total_hours
+            total_hours=total_hours,
+            is_approved=is_approved
         )
         messages.success(request, 'План дисциплины добавлен.')
         return redirect('admin_discipline_plans')
@@ -1515,9 +1522,14 @@ def admin_discipline_plan_create(request):
 def admin_discipline_plan_edit(request, plan_id):
     plan = get_object_or_404(DisciplinePlan, id=plan_id)
 
+    if plan.is_approved:
+        messages.error(request, 'Утверждённый план нельзя изменять.')
+        return redirect('admin_discipline_plans')
+
     if request.method == 'POST':
         plan.name = request.POST.get('name')
         plan.total_hours = request.POST.get('total_hours')
+        plan.is_approved = request.POST.get('is_approved') == 'on'
         plan.save()
         messages.success(request, 'План дисциплины обновлён.')
         return redirect('admin_discipline_plans')
@@ -1532,12 +1544,47 @@ def admin_discipline_plan_edit(request, plan_id):
 def admin_discipline_plan_delete(request, plan_id):
     plan = get_object_or_404(DisciplinePlan, id=plan_id)
 
+    if plan.is_approved:
+        messages.error(request, 'Утверждённый план нельзя удалить.')
+        return redirect('admin_discipline_plans')
+
     if Discipline.objects.filter(plan=plan).exists():
         messages.error(request, 'Нельзя удалить план, так как он используется в дисциплинах.')
         return redirect('admin_discipline_plans')
 
     plan.delete()
     messages.success(request, 'План дисциплины удалён.')
+    return redirect('admin_discipline_plans')
+
+
+@staff_member_required
+@require_POST
+def admin_discipline_plan_archive(request, plan_id):
+    plan = get_object_or_404(DisciplinePlan, id=plan_id)
+
+    if plan.is_archived:
+        plan.is_archived = False
+        plan.save(update_fields=['is_archived'])
+        messages.success(request, 'План дисциплины восстановлен из архива.')
+        return redirect('admin_discipline_plans')
+
+    if not plan.is_approved:
+        messages.error(request, 'В архив можно отправить только утверждённый план.')
+        return redirect('admin_discipline_plans')
+
+    if Discipline.objects.filter(
+        plan=plan,
+        semester__status__code='OPEN'
+    ).exists():
+        messages.error(
+            request,
+            'План используется в текущем открытом семестре и не может быть архивирован.'
+        )
+        return redirect('admin_discipline_plans')
+
+    plan.is_archived = True
+    plan.save(update_fields=['is_archived'])
+    messages.success(request, 'План дисциплины отправлен в архив.')
     return redirect('admin_discipline_plans')
 
 
@@ -1594,7 +1641,7 @@ def admin_discipline_create(request):
         messages.success(request, 'Дисциплина добавлена.')
         return redirect('admin_disciplines')
 
-    plans = DisciplinePlan.objects.all()
+    plans = DisciplinePlan.objects.filter(is_approved=True, is_archived=False)
     groups = Group.objects.all()
     teachers = Teacher.objects.select_related('user').all()
 
@@ -1618,7 +1665,7 @@ def admin_discipline_edit(request, discipline_id):
         messages.success(request, 'Дисциплина обновлена.')
         return redirect('admin_disciplines')
 
-    plans = DisciplinePlan.objects.all()
+    plans = DisciplinePlan.objects.filter(Q(is_approved=True, is_archived=False) | Q(id=discipline.plan_id))
     groups = Group.objects.all()
     teachers = Teacher.objects.select_related('user').all()
 
