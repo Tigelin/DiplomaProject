@@ -17,7 +17,7 @@ from django.db.models import Q, Sum
 from journal.models import (
     Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
-    Teacher, Classroom
+    Teacher, Classroom, AcademicSemester
 )
 from .forms import LessonFileUploadForm
 from django.urls import reverse
@@ -1205,6 +1205,16 @@ def export_journal_docx(request, discipline_id):
 @staff_member_required
 def admin_dashboard(request):
     return render(request, 'users/admin/dashboard.html')
+
+
+@staff_member_required
+def admin_semesters(request):
+    semesters = AcademicSemester.objects.select_related('status').order_by('-start_date')
+
+    context = {
+        'semesters': semesters,
+    }
+    return render(request, 'users/admin/semesters.html', context)
 
 
 @staff_member_required

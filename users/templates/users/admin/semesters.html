@@ -1,0 +1,60 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Учебные семестры{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item active">Учебные семестры</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-calendar-range"></i> Учебные семестры
+        </h4>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Учебный год</th>
+                        <th>Семестр</th>
+                        <th>Дата начала</th>
+                        <th>Дата окончания</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for semester in semesters %}
+                    <tr>
+                        <td>{{ semester.start_year }}/{{ semester.start_year|add:"1" }}</td>
+                        <td>{{ semester.number }}</td>
+                        <td>{{ semester.start_date|date:"d.m.Y" }}</td>
+                        <td>{{ semester.end_date|date:"d.m.Y" }}</td>
+                        <td>{{ semester.status.name }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">
+                            Учебные семестры не добавлены
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+{% endblock %}
