@@ -150,6 +150,7 @@ class DisciplinePlan(models.Model):
     name = models.CharField(max_length=200, verbose_name="Название дисциплины")
     total_hours = models.IntegerField(verbose_name="Общее количество часов")
     is_approved = models.BooleanField(default=False, verbose_name="Утверждён")
+    is_archived = models.BooleanField(default=False, verbose_name="В архиве")
 
     def __str__(self):
         return self.name
