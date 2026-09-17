@@ -1211,8 +1211,27 @@ def admin_dashboard(request):
 def admin_semesters(request):
     semesters = AcademicSemester.objects.select_related('status').order_by('-start_date')
 
+    search = request.GET.get('search', '')
+    if search:
+        semesters = semesters.filter(
+            Q(start_year__icontains=search) |
+            Q(status__name__icontains=search)
+        )
+
+    paginator = Paginator(semesters, 12)
+    page_number = request.GET.get('page')
+    semesters = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        semesters.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     context = {
         'semesters': semesters,
+        'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/admin/semesters.html', context)
 
