@@ -17,12 +17,13 @@ from django.db.models import Q, Sum
 from journal.models import (
     Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
-    Teacher, Classroom, AcademicSemester
+    Teacher, Classroom, AcademicSemester, AcademicSemesterStatus
 )
 from .forms import LessonFileUploadForm
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.db import transaction
+from django.core.exceptions import ValidationError
 
 # Create your views here.
 
@@ -1234,6 +1235,53 @@ def admin_semesters(request):
         'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/admin/semesters.html', context)
+
+
+@staff_member_required
+def admin_semester_create(request):
+    start_year = ''
+    semester_number = '1'
+    start_date = ''
+    end_date = ''
+
+    if request.method == 'POST':
+        start_year = request.POST.get('start_year')
+        semester_number = request.POST.get('semester_number')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+
+        if semester_number not in ['1', '2']:
+            messages.error(request, 'Выберите номер семестра.')
+        else:
+            draft_status = get_object_or_404(
+                AcademicSemesterStatus,
+                code='DRAFT'
+            )
+
+            semester = AcademicSemester(
+                start_year=start_year,
+                is_first_semester=semester_number == '1',
+                start_date=start_date,
+                end_date=end_date,
+                status=draft_status
+            )
+
+            try:
+                semester.full_clean()
+                semester.save()
+                messages.success(request, 'Учебный семестр добавлен.')
+                return redirect('admin_semesters')
+            except ValidationError as error:
+                for message in error.messages:
+                    messages.error(request, message)
+
+    context = {
+        'start_year': start_year,
+        'semester_number': semester_number,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'users/admin/semester_form.html', context)
 
 
 @staff_member_required

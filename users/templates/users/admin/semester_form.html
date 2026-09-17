@@ -1,0 +1,61 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Добавление семестра{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_semesters' %}">Учебные семестры</a></li>
+    <li class="breadcrumb-item active">Добавление</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-calendar-plus"></i> Добавление семестра
+        </h4>
+    </div>
+
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label class="form-label">Год начала учебного года</label>
+                <input type="number" name="start_year" class="form-control" value="{{ start_year }}" min="1" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Номер семестра</label>
+                <select name="semester_number" class="form-select" required>
+                    <option value="1" {% if semester_number == '1' %}selected{% endif %}>Первый</option>
+                    <option value="2" {% if semester_number == '2' %}selected{% endif %}>Второй</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Дата начала</label>
+                <input type="date" name="start_date" class="form-control" value="{{ start_date }}" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Дата окончания</label>
+                <input type="date" name="end_date" class="form-control" value="{{ end_date }}" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Сохранить
+            </button>
+
+            <a href="{% url 'admin_semesters' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Отмена
+            </a>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
