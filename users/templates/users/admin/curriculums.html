@@ -134,6 +134,14 @@
                                             <i class="bi bi-archive"></i> В архив
                                         </button>
                                     </form>
+                                {% elif curriculum.is_approved and curriculum.is_archived %}
+                                    <form method="post" action="{% url 'admin_curriculum_restore' curriculum.id %}" class="d-inline">
+                                        {% csrf_token %}
+
+                                        <button type="submit" class="btn btn-outline-success btn-sm">
+                                            <i class="bi bi-arrow-counterclockwise"></i> Восстановить
+                                        </button>
+                                    </form>
                                 {% endif %}
                             </td>
                         </tr>
