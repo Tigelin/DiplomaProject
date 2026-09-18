@@ -28,6 +28,7 @@ urlpatterns = [
     path('admin/curriculums/', views.admin_curriculums, name='admin_curriculums'),
     path('admin/curriculum/create/', views.admin_curriculum_create, name='admin_curriculum_create'),
     path('admin/curriculum/edit/<int:curriculum_id>/', views.admin_curriculum_edit, name='admin_curriculum_edit'),
+    path('admin/curriculum/<int:curriculum_id>/', views.admin_curriculum_detail, name='admin_curriculum_detail'),
     path('admin/schedules/', views.admin_schedules, name='admin_schedules'),
     path('admin/schedule/create/', views.admin_schedule_create, name='admin_schedule_create'),
     path('admin/schedule/edit/<int:schedule_id>/', views.admin_schedule_edit, name='admin_schedule_edit'),

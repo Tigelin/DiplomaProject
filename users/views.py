@@ -1503,6 +1503,21 @@ def admin_curriculum_edit(request, curriculum_id):
 
 
 @staff_member_required
+def admin_curriculum_detail(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum.objects.select_related('specialty'),
+        id=curriculum_id
+    )
+    items = curriculum.items.select_related('plan').order_by('plan__name')
+
+    context = {
+        'curriculum': curriculum,
+        'items': items,
+    }
+    return render(request, 'users/admin/curriculum_detail.html', context)
+
+
+@staff_member_required
 def admin_schedules(request):
     return redirect(f"{reverse('schedule_list')}?manage=1")
 

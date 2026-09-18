@@ -110,6 +110,9 @@
                             </td>
                             <td>{{ curriculum.item_count }}</td>
                             <td class="text-end">
+                                <a href="{% url 'admin_curriculum_detail' curriculum.id %}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-list-check"></i> Состав
+                                </a>
                                 {% if not curriculum.is_approved and not curriculum.is_archived %}
                                     <a href="{% url 'admin_curriculum_edit' curriculum.id %}" class="btn btn-outline-primary btn-sm">
                                         <i class="bi bi-pencil"></i> Изменить

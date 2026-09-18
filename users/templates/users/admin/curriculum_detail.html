@@ -1,0 +1,77 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Состав учебного плана{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_curriculums' %}">Учебные планы специальностей</a></li>
+    <li class="breadcrumb-item active">Состав</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-list-check"></i> {{ curriculum.name }}
+        </h4>
+    </div>
+
+    <div class="card-body">
+        <p>
+            <strong>Специальность:</strong>
+            {{ curriculum.specialty.code }} — {{ curriculum.specialty.name }}
+        </p>
+        <p>
+            <strong>Семестр обучения:</strong>
+            {{ curriculum.study_semester }}
+        </p>
+        <p>
+            <strong>Состояние:</strong>
+
+            {% if curriculum.is_archived %}
+                <span class="badge bg-dark">Архив</span>
+            {% elif curriculum.is_approved %}
+                <span class="badge bg-success">Утверждён</span>
+            {% else %}
+                <span class="badge bg-secondary">Черновик</span>
+            {% endif %}
+        </p>
+
+        <h5>Дисциплины учебного плана</h5>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Часы</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td>{{ item.plan.name }}</td>
+                            <td>{{ item.plan.total_hours }} ч.</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="2" class="text-center">
+                                Дисциплины не добавлены
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <a href="{% url 'admin_curriculums' %}?specialty_id={{ curriculum.specialty_id }}&study_semester={{ curriculum.study_semester }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+{% endblock %}
