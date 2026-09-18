@@ -41,7 +41,129 @@
             {% endif %}
         </p>
 
+        {% if is_draft %}
+            <hr>
+
+            <h5>Добавление дисциплины</h5>
+
+            <form method="get" class="row g-2 mb-3">
+                <div class="col-md-9">
+                    <input type="text" name="available_search" class="form-control" placeholder="Поиск по названию..." value="{{ available_search }}">
+                </div>
+
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-search"></i> Найти
+                    </button>
+                </div>
+            </form>
+
+            {% if available_search %}
+                <a href="{% url 'admin_curriculum_detail' curriculum.id %}" class="btn btn-outline-secondary btn-sm mb-3">
+                    Сбросить поиск
+                </a>
+            {% endif %}
+
+            <div class="table-responsive mb-4">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Часы</th>
+                            <th class="text-end">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for plan in available_plans %}
+                            <tr>
+                                <td>{{ plan.name }}</td>
+                                <td>{{ plan.total_hours }} ч.</td>
+                                <td class="text-end">
+                                    <form method="post" action="{% url 'admin_curriculum_item_add' curriculum.id %}">
+                                        {% csrf_token %}
+                                        <button type="submit" name="plan_id" value="{{ plan.id }}" class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-plus"></i> Добавить
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center">
+                                    Доступные дисциплины не найдены
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if available_plans.has_other_pages %}
+                <nav aria-label="Навигация по доступным дисциплинам">
+                    <ul class="pagination justify-content-center">
+
+                        {% if available_plans.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?available_page={{ available_plans.previous_page_number }}{% if available_search %}&available_search={{ available_search|urlencode }}{% endif %}">
+                                    Назад
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for page_number in available_page_range %}
+
+                            {% if page_number == available_ellipsis %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">{{ page_number }}</span>
+                                </li>
+
+                            {% elif page_number == available_plans.number %}
+                                <li class="page-item active" aria-current="page">
+                                    <span class="page-link">{{ page_number }}</span>
+                                </li>
+
+                            {% else %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?available_page={{ page_number }}{% if available_search %}&available_search={{ available_search|urlencode }}{% endif %}">
+                                        {{ page_number }}
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                        {% endfor %}
+
+                        {% if available_plans.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?available_page={{ available_plans.next_page_number }}{% if available_search %}&available_search={{ available_search|urlencode }}{% endif %}">
+                                    Вперёд
+                                </a>
+                            </li>
+                        {% endif %}
+
+                    </ul>
+                </nav>
+            {% endif %}
+        {% endif %}
+
         <h5>Дисциплины учебного плана</h5>
+
+        <form method="get" class="row g-2 mb-3">
+            <div class="col-md-9">
+                <input type="text" name="item_search" class="form-control" placeholder="Поиск по названию..." value="{{ item_search }}">
+            </div>
+
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> Найти
+                </button>
+            </div>
+        </form>
+
+        {% if item_search %}
+            <a href="{% url 'admin_curriculum_detail' curriculum.id %}" class="btn btn-outline-secondary btn-sm mb-3">
+                Сбросить поиск
+            </a>
+        {% endif %}
 
         <div class="table-responsive">
             <table class="table table-hover align-middle">
@@ -67,6 +189,52 @@
                 </tbody>
             </table>
         </div>
+
+        {% if items.has_other_pages %}
+            <nav aria-label="Навигация по дисциплинам учебного плана">
+                <ul class="pagination justify-content-center">
+
+                    {% if items.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?item_page={{ items.previous_page_number }}{% if item_search %}&item_search={{ item_search|urlencode }}{% endif %}">
+                                Назад
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for page_number in item_page_range %}
+
+                        {% if page_number == item_ellipsis %}
+                            <li class="page-item disabled">
+                                <span class="page-link">{{ page_number }}</span>
+                            </li>
+
+                        {% elif page_number == items.number %}
+                            <li class="page-item active" aria-current="page">
+                                <span class="page-link">{{ page_number }}</span>
+                            </li>
+
+                        {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="?item_page={{ page_number }}{% if item_search %}&item_search={{ item_search|urlencode }}{% endif %}">
+                                    {{ page_number }}
+                                </a>
+                            </li>
+                        {% endif %}
+
+                    {% endfor %}
+
+                    {% if items.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?item_page={{ items.next_page_number }}{% if item_search %}&item_search={{ item_search|urlencode }}{% endif %}">
+                                Вперёд
+                            </a>
+                        </li>
+                    {% endif %}
+
+                </ul>
+            </nav>
+        {% endif %}
 
         <a href="{% url 'admin_curriculums' %}?specialty_id={{ curriculum.specialty_id }}&study_semester={{ curriculum.study_semester }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Назад

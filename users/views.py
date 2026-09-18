@@ -18,7 +18,7 @@ from journal.models import (
     Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
     Teacher, Classroom, AcademicSemester, AcademicSemesterStatus,
-    Specialty, SpecialtyCurriculum
+    Specialty, SpecialtyCurriculum, SpecialtyCurriculumItem
 )
 from .forms import LessonFileUploadForm
 from django.urls import reverse
@@ -1508,13 +1508,106 @@ def admin_curriculum_detail(request, curriculum_id):
         SpecialtyCurriculum.objects.select_related('specialty'),
         id=curriculum_id
     )
+
+    item_search = request.GET.get('item_search', '')
     items = curriculum.items.select_related('plan').order_by('plan__name')
+
+    if item_search:
+        items = items.filter(plan__name__icontains=item_search)
+
+    item_paginator = Paginator(items, 8)
+    items = item_paginator.get_page(request.GET.get('item_page'))
+    item_page_range = item_paginator.get_elided_page_range(
+        items.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+    item_ellipsis = item_paginator.ELLIPSIS
+
+    is_draft = not curriculum.is_approved and not curriculum.is_archived
+    available_search = request.GET.get('available_search', '')
+    available_plans = DisciplinePlan.objects.none()
+    available_page_range = []
+    available_ellipsis = None
+
+    if is_draft:
+        item_plan_ids = curriculum.items.values_list('plan_id', flat=True)
+        available_plans = DisciplinePlan.objects.filter(
+            is_approved=True,
+            is_archived=False
+        ).exclude(
+            id__in=item_plan_ids
+        ).order_by(
+            'name'
+        )
+
+        if available_search:
+            available_plans = available_plans.filter(
+                name__icontains=available_search
+            )
+
+        available_paginator = Paginator(available_plans, 8)
+        available_plans = available_paginator.get_page(
+            request.GET.get('available_page')
+        )
+        available_page_range = available_paginator.get_elided_page_range(
+            available_plans.number,
+            on_each_side=2,
+            on_ends=1,
+        )
+        available_ellipsis = available_paginator.ELLIPSIS
 
     context = {
         'curriculum': curriculum,
         'items': items,
+        'item_search': item_search,
+        'item_page_range': item_page_range,
+        'item_ellipsis': item_ellipsis,
+        'is_draft': is_draft,
+        'available_plans': available_plans,
+        'available_search': available_search,
+        'available_page_range': available_page_range,
+        'available_ellipsis': available_ellipsis,
     }
     return render(request, 'users/admin/curriculum_detail.html', context)
+
+
+@staff_member_required
+@require_POST
+def admin_curriculum_item_add(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Изменять состав можно только у черновика учебного плана.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    plan = get_object_or_404(
+        DisciplinePlan,
+        id=request.POST.get('plan_id'),
+        is_approved=True,
+        is_archived=False
+    )
+
+    item = SpecialtyCurriculumItem(
+        curriculum=curriculum,
+        plan=plan
+    )
+
+    try:
+        item.full_clean()
+        item.save()
+        messages.success(request, 'Дисциплина добавлена в учебный план.')
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+
+    return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
 
 
 @staff_member_required
