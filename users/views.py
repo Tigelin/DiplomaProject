@@ -13,12 +13,12 @@ from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
 from journal.models import (
     Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
     Teacher, Classroom, AcademicSemester, AcademicSemesterStatus,
-    Specialty, SpecialtyCurriculumItem
+    Specialty, SpecialtyCurriculum
 )
 from .forms import LessonFileUploadForm
 from django.urls import reverse
@@ -1340,7 +1340,8 @@ def admin_curriculums(request):
     selected_specialty = None
     study_semester = None
     semester_numbers = []
-    curriculum_items = SpecialtyCurriculumItem.objects.none()
+    curriculums = SpecialtyCurriculum.objects.none()
+    show_archived = request.GET.get('show_archived') == '1'
 
     specialty_id = request.GET.get('specialty_id')
     semester_number = request.GET.get('study_semester')
@@ -1365,21 +1366,27 @@ def admin_curriculums(request):
                 messages.error(request, 'Выбран неверный семестр обучения.')
                 study_semester = None
             else:
-                curriculum_items = SpecialtyCurriculumItem.objects.select_related(
-                    'plan'
-                ).filter(
+                curriculums = SpecialtyCurriculum.objects.filter(
                     specialty=selected_specialty,
                     study_semester=study_semester
+                ).prefetch_related(
+                    'semester_selections__semester'
+                ).annotate(
+                    item_count=Count('items')
                 ).order_by(
-                    'plan__name'
+                    'name'
                 )
+
+                if not show_archived:
+                    curriculums = curriculums.filter(is_archived=False)
 
     context = {
         'specialties': specialties,
         'selected_specialty': selected_specialty,
         'semester_numbers': semester_numbers,
         'study_semester': study_semester,
-        'curriculum_items': curriculum_items,
+        'curriculums': curriculums,
+        'show_archived': show_archived,
     }
     return render(request, 'users/admin/curriculums.html', context)
 

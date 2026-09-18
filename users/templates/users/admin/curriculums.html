@@ -13,14 +13,31 @@
 {% block content %}
 
 <div class="card">
-    <div class="card-header bg-primary text-white">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h4 class="mb-0">
             <i class="bi bi-list-check"></i> Учебные планы специальностей
         </h4>
+
+        {% if selected_specialty and study_semester %}
+            {% if show_archived %}
+                <a href="?specialty_id={{ selected_specialty.id }}&study_semester={{ study_semester }}" class="btn btn-light btn-sm">
+                    Только активные
+                </a>
+            {% else %}
+                <a href="?specialty_id={{ selected_specialty.id }}&study_semester={{ study_semester }}&show_archived=1" class="btn btn-light btn-sm">
+                    Показать все
+                </a>
+            {% endif %}
+        {% endif %}
     </div>
 
     <div class="card-body">
         <form method="get" class="mb-4">
+
+            {% if show_archived %}
+                <input type="hidden" name="show_archived" value="1">
+            {% endif %}
+
             <div class="row g-2">
                 <div class="{% if selected_specialty %}col-md-6{% else %}col-md-10{% endif %}">
                     <label class="form-label">Специальность</label>
@@ -66,28 +83,38 @@
                 <table class="table table-hover align-middle">
                     <thead>
                         <tr>
-                            <th>Дисциплина</th>
-                            <th>Количество часов</th>
-                            <th>Состояние плана</th>
+                            <th>Название</th>
+                            <th>Состояние</th>
+                            <th>Дисциплины</th>
+                            <th>Использование</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in curriculum_items %}
+                        {% for curriculum in curriculums %}
                         <tr>
-                            <td>{{ item.plan.name }}</td>
-                            <td>{{ item.plan.total_hours }}</td>
+                            <td>{{ curriculum.name }}</td>
                             <td>
-                                {% if item.plan.is_archived %}
+                                {% if curriculum.is_archived %}
                                     <span class="badge bg-dark">Архив</span>
+                                {% elif curriculum.is_approved %}
+                                    <span class="badge bg-success">Утверждён</span>
                                 {% else %}
-                                    <span class="badge bg-success">Активен</span>
+                                    <span class="badge bg-secondary">Черновик</span>
                                 {% endif %}
+                            </td>
+                            <td>{{ curriculum.item_count }}</td>
+                            <td>
+                                {% for selection in curriculum.semester_selections.all %}
+                                    <div>{{ selection.semester }}</div>
+                                {% empty %}
+                                    <span class="text-muted">Не использовался</span>
+                                {% endfor %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="3" class="text-center">
-                                В учебном плане пока нет дисциплин
+                            <td colspan="4" class="text-center">
+                                Учебные планы не найдены
                             </td>
                         </tr>
                         {% endfor %}
