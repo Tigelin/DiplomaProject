@@ -24,6 +24,7 @@ urlpatterns = [
     path('admin/', views.admin_dashboard, name='admin_dashboard'),
     path('admin/semesters/', views.admin_semesters, name='admin_semesters'),
     path('admin/semester/create/', views.admin_semester_create, name='admin_semester_create'),
+    path('admin/semester/edit/<int:semester_id>/', views.admin_semester_edit, name='admin_semester_edit'),
     path('admin/schedules/', views.admin_schedules, name='admin_schedules'),
     path('admin/schedule/create/', views.admin_schedule_create, name='admin_schedule_create'),
     path('admin/schedule/edit/<int:schedule_id>/', views.admin_schedule_edit, name='admin_schedule_edit'),

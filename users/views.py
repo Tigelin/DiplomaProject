@@ -1285,6 +1285,55 @@ def admin_semester_create(request):
 
 
 @staff_member_required
+def admin_semester_edit(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(request, 'Изменять можно только черновик семестра.')
+        return redirect('admin_semesters')
+
+    start_year = semester.start_year
+    semester_number = str(semester.number)
+    start_date = semester.start_date.strftime('%Y-%m-%d')
+    end_date = semester.end_date.strftime('%Y-%m-%d')
+
+    if request.method == 'POST':
+        start_year = request.POST.get('start_year')
+        semester_number = request.POST.get('semester_number')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+
+        if semester_number not in ['1', '2']:
+            messages.error(request, 'Выберите номер семестра.')
+        else:
+            semester.start_year = start_year
+            semester.is_first_semester = semester_number == '1'
+            semester.start_date = start_date
+            semester.end_date = end_date
+
+            try:
+                semester.full_clean()
+                semester.save()
+                messages.success(request, 'Учебный семестр обновлён.')
+                return redirect('admin_semesters')
+            except ValidationError as error:
+                for message in error.messages:
+                    messages.error(request, message)
+
+    context = {
+        'semester': semester,
+        'start_year': start_year,
+        'semester_number': semester_number,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'users/admin/semester_form.html', context)
+
+
+@staff_member_required
 def admin_schedules(request):
     return redirect(f"{reverse('schedule_list')}?manage=1")
 
