@@ -160,7 +160,33 @@ class DisciplinePlan(models.Model):
         verbose_name_plural = "Планы дисциплин"
 
 
+class SpecialtyCurriculum(models.Model):
+    name = models.CharField(max_length=200, verbose_name="Название")
+    specialty = models.ForeignKey(Specialty, on_delete=models.CASCADE, verbose_name="Специальность")
+    study_semester = models.PositiveSmallIntegerField(verbose_name="Семестр обучения")
+    is_approved = models.BooleanField(default=False, verbose_name="Утверждён")
+    is_archived = models.BooleanField(default=False, verbose_name="В архиве")
+
+    def clean(self):
+        super().clean()
+
+        if self.specialty_id and self.study_semester:
+            if self.study_semester < 1 or self.study_semester > self.specialty.duration_semesters:
+                raise ValidationError({
+                    'study_semester': 'Выбран неверный семестр обучения.'
+                })
+
+    def __str__(self):
+        return f"{self.name} — {self.specialty}, {self.study_semester} семестр"
+
+    class Meta:
+        verbose_name = "Учебный план специальности"
+        verbose_name_plural = "Учебные планы специальностей"
+        unique_together = ['name', 'specialty', 'study_semester']
+
+
 class SpecialtyCurriculumItem(models.Model):
+    curriculum = models.ForeignKey(SpecialtyCurriculum, on_delete=models.CASCADE, null=True, blank=True, related_name='items', verbose_name="Учебный план")
     specialty = models.ForeignKey(Specialty, on_delete=models.CASCADE, verbose_name="Специальность")
     study_semester = models.PositiveSmallIntegerField(verbose_name="Семестр обучения")
     plan = models.ForeignKey(DisciplinePlan, on_delete=models.PROTECT, limit_choices_to={'is_approved': True}, verbose_name="План дисциплины")
@@ -297,6 +323,40 @@ class AcademicSemester(models.Model):
                 name='academic_semester_dates_order',
             ),
         ]
+
+
+class AcademicSemesterCurriculum(models.Model):
+    semester = models.ForeignKey(AcademicSemester, on_delete=models.CASCADE, related_name='curriculum_selections', verbose_name="Учебный семестр")
+    curriculum = models.ForeignKey(SpecialtyCurriculum, on_delete=models.PROTECT, related_name='semester_selections', verbose_name="Учебный план")
+
+    def clean(self):
+        super().clean()
+
+        if self.curriculum_id:
+            if not self.curriculum.is_approved or self.curriculum.is_archived:
+                raise ValidationError({
+                    'curriculum': 'Выберите утверждённый учебный план, который не находится в архиве.'
+                })
+
+        if self.semester_id and self.curriculum_id:
+            selected_curriculums = AcademicSemesterCurriculum.objects.filter(
+                semester_id=self.semester_id,
+                curriculum__specialty_id=self.curriculum.specialty_id,
+                curriculum__study_semester=self.curriculum.study_semester
+            ).exclude(pk=self.pk)
+
+            if selected_curriculums.exists():
+                raise ValidationError(
+                    'Для этой специальности и семестра обучения учебный план уже выбран.'
+                )
+
+    def __str__(self):
+        return f"{self.semester} — {self.curriculum}"
+
+    class Meta:
+        verbose_name = "Учебный план учебного семестра"
+        verbose_name_plural = "Учебные планы учебных семестров"
+        unique_together = ['semester', 'curriculum']
 
 
 class Discipline(models.Model):
