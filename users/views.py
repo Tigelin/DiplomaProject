@@ -2006,6 +2006,17 @@ def admin_discipline_plan_archive(request, plan_id):
         )
         return redirect('admin_discipline_plans')
 
+    if SpecialtyCurriculumItem.objects.filter(
+            plan=plan,
+            curriculum__is_approved=True,
+            curriculum__is_archived=False
+    ).exists():
+        messages.error(
+            request,
+            'План входит в утверждённый учебный план специальности и не может быть архивирован.'
+        )
+        return redirect('admin_discipline_plans')
+
     plan.is_archived = True
     plan.save(update_fields=['is_archived'])
     messages.success(request, 'План дисциплины отправлен в архив.')
