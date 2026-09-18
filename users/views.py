@@ -1335,6 +1335,65 @@ def admin_semester_edit(request, semester_id):
 
 
 @staff_member_required
+def admin_semester_curriculums(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Выбирать учебные планы можно только для черновика семестра.'
+        )
+        return redirect('admin_semesters')
+
+    selections = {}
+
+    for selection in semester.curriculum_selections.select_related('curriculum'):
+        key = (
+            selection.curriculum.specialty_id,
+            selection.curriculum.study_semester
+        )
+        selections[key] = selection.curriculum
+
+    curriculum_rows = []
+    added_pairs = set()
+    groups = Group.objects.filter(
+        is_graduated=False
+    ).select_related(
+        'specialty'
+    ).order_by(
+        'specialty__name',
+        'year'
+    )
+
+    for group in groups:
+        study_semester = group.get_study_semester(semester)
+
+        if study_semester < 1 or study_semester > group.specialty.duration_semesters:
+            continue
+
+        key = (group.specialty_id, study_semester)
+
+        if key in added_pairs:
+            continue
+
+        added_pairs.add(key)
+        curriculum_rows.append({
+            'specialty': group.specialty,
+            'study_semester': study_semester,
+            'curriculum': selections.get(key),
+        })
+
+    context = {
+        'semester': semester,
+        'curriculum_rows': curriculum_rows,
+    }
+    return render(request, 'users/admin/semester_curriculums.html', context)
+
+
+@staff_member_required
 def admin_curriculums(request):
     specialties = Specialty.objects.order_by('name')
     selected_specialty = None

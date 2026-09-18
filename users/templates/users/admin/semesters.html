@@ -60,6 +60,9 @@
                                 <a href="{% url 'admin_semester_edit' semester.id %}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-pencil"></i>
                                 </a>
+                                <a href="{% url 'admin_semester_curriculums' semester.id %}" class="btn btn-sm btn-outline-secondary" title="Учебные планы">
+                                    <i class="bi bi-list-check"></i>
+                                </a>
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}

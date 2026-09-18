@@ -1,0 +1,65 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Учебные планы семестра{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_semesters' %}">Учебные семестры</a></li>
+    <li class="breadcrumb-item active">Учебные планы</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-list-check"></i>
+            Учебные планы на {{ semester.start_year }}/{{ semester.start_year|add:"1" }} учебный год,
+            {{ semester.number }} семестр
+        </h4>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Специальность</th>
+                        <th>Семестр обучения</th>
+                        <th>Учебный план</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in curriculum_rows %}
+                        <tr>
+                            <td>{{ row.specialty.code }} — {{ row.specialty.name }}</td>
+                            <td>{{ row.study_semester }}</td>
+                            <td>
+                                {% if row.curriculum %}
+                                    {{ row.curriculum.name }}
+                                {% else %}
+                                    <span class="text-muted">Не выбран</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center">
+                                Для этого семестра нет подходящих групп
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <a href="{% url 'admin_semesters' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+{% endblock %}
