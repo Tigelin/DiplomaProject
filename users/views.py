@@ -1621,6 +1621,33 @@ def admin_curriculum_approve(request, curriculum_id):
 
 @staff_member_required
 @require_POST
+def admin_curriculum_delete(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Удалить можно только черновик учебного плана.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    specialty_id = curriculum.specialty_id
+    study_semester = curriculum.study_semester
+
+    curriculum.delete()
+    messages.success(request, 'Черновик учебного плана удалён.')
+    return redirect(
+        f"{reverse('admin_curriculums')}?"
+        f"specialty_id={specialty_id}&"
+        f"study_semester={study_semester}"
+    )
+
+
+@staff_member_required
+@require_POST
 def admin_curriculum_item_add(request, curriculum_id):
     curriculum = get_object_or_404(
         SpecialtyCurriculum,
