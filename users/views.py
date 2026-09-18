@@ -1392,6 +1392,57 @@ def admin_curriculums(request):
 
 
 @staff_member_required
+def admin_curriculum_create(request):
+    specialties = Specialty.objects.order_by('name')
+    selected_specialty = None
+    name = ''
+    study_semester = request.GET.get('study_semester', '')
+
+    specialty_id = request.GET.get('specialty_id')
+
+    if specialty_id:
+        selected_specialty = get_object_or_404(
+            Specialty,
+            id=specialty_id
+        )
+
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        study_semester = request.POST.get('study_semester')
+        selected_specialty = get_object_or_404(
+            Specialty,
+            id=request.POST.get('specialty_id')
+        )
+
+        curriculum = SpecialtyCurriculum(
+            name=name,
+            specialty=selected_specialty,
+            study_semester=study_semester
+        )
+
+        try:
+            curriculum.full_clean()
+            curriculum.save()
+            messages.success(request, 'Учебный план добавлен.')
+            return redirect(
+                f"{reverse('admin_curriculums')}?"
+                f"specialty_id={curriculum.specialty_id}&"
+                f"study_semester={curriculum.study_semester}"
+            )
+        except ValidationError as error:
+            for message in error.messages:
+                messages.error(request, message)
+
+    context = {
+        'specialties': specialties,
+        'selected_specialty': selected_specialty,
+        'name': name,
+        'study_semester': study_semester,
+    }
+    return render(request, 'users/admin/curriculum_form.html', context)
+
+
+@staff_member_required
 def admin_schedules(request):
     return redirect(f"{reverse('schedule_list')}?manage=1")
 
