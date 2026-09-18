@@ -42,6 +42,14 @@
         </p>
 
         {% if is_draft %}
+            <form method="post" action="{% url 'admin_curriculum_approve' curriculum.id %}" class="mb-4">
+                {% csrf_token %}
+
+                <button type="submit" class="btn btn-success" onclick="return confirm('Утвердить учебный план? После утверждения изменить его будет нельзя.')">
+                    <i class="bi bi-check-circle"></i> Утвердить
+                </button>
+            </form>
+
             <hr>
 
             <h5>Добавление дисциплины</h5>

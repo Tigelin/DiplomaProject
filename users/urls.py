@@ -29,6 +29,7 @@ urlpatterns = [
     path('admin/curriculum/create/', views.admin_curriculum_create, name='admin_curriculum_create'),
     path('admin/curriculum/edit/<int:curriculum_id>/', views.admin_curriculum_edit, name='admin_curriculum_edit'),
     path('admin/curriculum/<int:curriculum_id>/', views.admin_curriculum_detail, name='admin_curriculum_detail'),
+    path('admin/curriculum/<int:curriculum_id>/approve/', views.admin_curriculum_approve, name='admin_curriculum_approve'),
     path('admin/curriculum/<int:curriculum_id>/item/add/', views.admin_curriculum_item_add, name='admin_curriculum_item_add'),
     path('admin/curriculum/item/delete/<int:item_id>/', views.admin_curriculum_item_delete, name='admin_curriculum_item_delete'),
     path('admin/schedules/', views.admin_schedules, name='admin_schedules'),

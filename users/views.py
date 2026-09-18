@@ -1574,6 +1574,53 @@ def admin_curriculum_detail(request, curriculum_id):
 
 @staff_member_required
 @require_POST
+def admin_curriculum_approve(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Утвердить можно только черновик учебного плана.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    items = curriculum.items.select_related('plan')
+
+    if not items.exists():
+        messages.error(
+            request,
+            'Нельзя утвердить учебный план без дисциплин.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    if items.exclude(
+            plan__is_approved=True,
+            plan__is_archived=False
+    ).exists():
+        messages.error(
+            request,
+            'Все дисциплины должны быть утверждены и не находиться в архиве.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    curriculum.is_approved = True
+
+    try:
+        curriculum.full_clean()
+        curriculum.save(update_fields=['is_approved'])
+        messages.success(request, 'Учебный план утверждён.')
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+
+    return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+
+@staff_member_required
+@require_POST
 def admin_curriculum_item_add(request, curriculum_id):
     curriculum = get_object_or_404(
         SpecialtyCurriculum,
