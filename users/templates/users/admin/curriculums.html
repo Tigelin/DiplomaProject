@@ -1,0 +1,113 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Учебные планы специальностей{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item active">Учебные планы специальностей</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-list-check"></i> Учебные планы специальностей
+        </h4>
+    </div>
+
+    <div class="card-body">
+        <form method="get" class="mb-4">
+            <div class="row g-2">
+                <div class="{% if selected_specialty %}col-md-6{% else %}col-md-10{% endif %}">
+                    <label class="form-label">Специальность</label>
+                    <select name="specialty_id" class="form-select" required>
+                        <option value="">-- Выберите --</option>
+                        {% for specialty in specialties %}
+                            <option value="{{ specialty.id }}" {% if selected_specialty.id == specialty.id %}selected{% endif %}>
+                                {{ specialty.code }} — {{ specialty.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {% if selected_specialty %}
+                <div class="col-md-4">
+                    <label class="form-label">Семестр обучения</label>
+                    <select name="study_semester" class="form-select">
+                        <option value="">-- Выберите --</option>
+                        {% for semester_number in semester_numbers %}
+                            <option value="{{ semester_number }}" {% if study_semester == semester_number %}selected{% endif %}>
+                                {{ semester_number }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        {% if selected_specialty %}Показать{% else %}Выбрать{% endif %}
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        {% if selected_specialty and study_semester %}
+            <h5 class="mb-3">
+                {{ selected_specialty.code }} — {{ selected_specialty.name }},
+                {{ study_semester }} семестр
+            </h5>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Дисциплина</th>
+                            <th>Количество часов</th>
+                            <th>Состояние плана</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in curriculum_items %}
+                        <tr>
+                            <td>{{ item.plan.name }}</td>
+                            <td>{{ item.plan.total_hours }}</td>
+                            <td>
+                                {% if item.plan.is_archived %}
+                                    <span class="badge bg-dark">Архив</span>
+                                {% else %}
+                                    <span class="badge bg-success">Активен</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center">
+                                В учебном плане пока нет дисциплин
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% elif selected_specialty %}
+            <div class="alert alert-secondary mb-0">
+                Теперь выберите семестр обучения.
+            </div>
+        {% else %}
+            <div class="alert alert-secondary mb-0">
+                Выберите специальность.
+            </div>
+        {% endif %}
+
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+{% endblock %}

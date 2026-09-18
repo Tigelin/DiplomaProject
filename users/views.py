@@ -17,7 +17,8 @@ from django.db.models import Q, Sum
 from journal.models import (
     Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
-    Teacher, Classroom, AcademicSemester, AcademicSemesterStatus
+    Teacher, Classroom, AcademicSemester, AcademicSemesterStatus,
+    Specialty, SpecialtyCurriculumItem
 )
 from .forms import LessonFileUploadForm
 from django.urls import reverse
@@ -1331,6 +1332,56 @@ def admin_semester_edit(request, semester_id):
         'end_date': end_date,
     }
     return render(request, 'users/admin/semester_form.html', context)
+
+
+@staff_member_required
+def admin_curriculums(request):
+    specialties = Specialty.objects.order_by('name')
+    selected_specialty = None
+    study_semester = None
+    semester_numbers = []
+    curriculum_items = SpecialtyCurriculumItem.objects.none()
+
+    specialty_id = request.GET.get('specialty_id')
+    semester_number = request.GET.get('study_semester')
+
+    if specialty_id:
+        selected_specialty = get_object_or_404(
+            Specialty,
+            id=specialty_id
+        )
+        semester_numbers = range(
+            1,
+            selected_specialty.duration_semesters + 1
+        )
+
+    if selected_specialty and semester_number:
+        try:
+            study_semester = int(semester_number)
+        except ValueError:
+            messages.error(request, 'Выберите семестр обучения.')
+        else:
+            if study_semester < 1 or study_semester > selected_specialty.duration_semesters:
+                messages.error(request, 'Выбран неверный семестр обучения.')
+                study_semester = None
+            else:
+                curriculum_items = SpecialtyCurriculumItem.objects.select_related(
+                    'plan'
+                ).filter(
+                    specialty=selected_specialty,
+                    study_semester=study_semester
+                ).order_by(
+                    'plan__name'
+                )
+
+    context = {
+        'specialties': specialties,
+        'selected_specialty': selected_specialty,
+        'semester_numbers': semester_numbers,
+        'study_semester': study_semester,
+        'curriculum_items': curriculum_items,
+    }
+    return render(request, 'users/admin/curriculums.html', context)
 
 
 @staff_member_required
