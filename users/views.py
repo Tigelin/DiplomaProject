@@ -1369,8 +1369,6 @@ def admin_curriculums(request):
                 curriculums = SpecialtyCurriculum.objects.filter(
                     specialty=selected_specialty,
                     study_semester=study_semester
-                ).prefetch_related(
-                    'semester_selections__semester'
                 ).annotate(
                     item_count=Count('items')
                 ).order_by(
@@ -1438,6 +1436,68 @@ def admin_curriculum_create(request):
         'selected_specialty': selected_specialty,
         'name': name,
         'study_semester': study_semester,
+    }
+    return render(request, 'users/admin/curriculum_form.html', context)
+
+
+@staff_member_required
+def admin_curriculum_edit(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum.objects.select_related('specialty'),
+        id=curriculum_id
+    )
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Изменять можно только черновик учебного плана.'
+        )
+        return redirect(
+            f"{reverse('admin_curriculums')}?"
+            f"specialty_id={curriculum.specialty_id}&"
+            f"study_semester={curriculum.study_semester}"
+        )
+
+    specialties = Specialty.objects.order_by('name')
+    selected_specialty = curriculum.specialty
+    name = curriculum.name
+    study_semester = curriculum.study_semester
+    return_specialty_id = curriculum.specialty_id
+    return_study_semester = curriculum.study_semester
+
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        study_semester = request.POST.get('study_semester')
+        selected_specialty = get_object_or_404(
+            Specialty,
+            id=request.POST.get('specialty_id')
+        )
+
+        curriculum.name = name
+        curriculum.specialty = selected_specialty
+        curriculum.study_semester = study_semester
+
+        try:
+            curriculum.full_clean()
+            curriculum.save()
+            messages.success(request, 'Учебный план изменён.')
+            return redirect(
+                f"{reverse('admin_curriculums')}?"
+                f"specialty_id={curriculum.specialty_id}&"
+                f"study_semester={curriculum.study_semester}"
+            )
+        except ValidationError as error:
+            for message in error.messages:
+                messages.error(request, message)
+
+    context = {
+        'curriculum': curriculum,
+        'specialties': specialties,
+        'selected_specialty': selected_specialty,
+        'name': name,
+        'study_semester': study_semester,
+        'return_specialty_id': return_specialty_id,
+        'return_study_semester': return_study_semester,
     }
     return render(request, 'users/admin/curriculum_form.html', context)
 

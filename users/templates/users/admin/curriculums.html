@@ -92,7 +92,7 @@
                             <th>Название</th>
                             <th>Состояние</th>
                             <th>Дисциплины</th>
-                            <th>Использование</th>
+                            <th class="text-end">Действия</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -109,12 +109,12 @@
                                 {% endif %}
                             </td>
                             <td>{{ curriculum.item_count }}</td>
-                            <td>
-                                {% for selection in curriculum.semester_selections.all %}
-                                    <div>{{ selection.semester }}</div>
-                                {% empty %}
-                                    <span class="text-muted">Не использовался</span>
-                                {% endfor %}
+                            <td class="text-end">
+                                {% if not curriculum.is_approved and not curriculum.is_archived %}
+                                    <a href="{% url 'admin_curriculum_edit' curriculum.id %}" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-pencil"></i> Изменить
+                                    </a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
