@@ -113,6 +113,7 @@
                                 <a href="{% url 'admin_curriculum_detail' curriculum.id %}" class="btn btn-outline-secondary btn-sm">
                                     <i class="bi bi-list-check"></i> Состав
                                 </a>
+
                                 {% if not curriculum.is_approved and not curriculum.is_archived %}
                                     <a href="{% url 'admin_curriculum_edit' curriculum.id %}" class="btn btn-outline-primary btn-sm">
                                         <i class="bi bi-pencil"></i> Изменить
@@ -123,6 +124,14 @@
 
                                         <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Удалить черновик учебного плана вместе с его составом?')">
                                             <i class="bi bi-trash"></i> Удалить
+                                        </button>
+                                    </form>
+                                {% elif curriculum.is_approved and not curriculum.is_archived %}
+                                    <form method="post" action="{% url 'admin_curriculum_archive' curriculum.id %}" class="d-inline">
+                                        {% csrf_token %}
+
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm" onclick="return confirm('Отправить учебный план в архив?')">
+                                            <i class="bi bi-archive"></i> В архив
                                         </button>
                                     </form>
                                 {% endif %}

@@ -1648,6 +1648,43 @@ def admin_curriculum_delete(request, curriculum_id):
 
 @staff_member_required
 @require_POST
+def admin_curriculum_archive(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if not curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Отправить в архив можно только утверждённый учебный план.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    if curriculum.semester_selections.filter(
+            semester__status__code='DRAFT'
+    ).exists():
+        messages.error(
+            request,
+            'Учебный план выбран для чернового учебного семестра и не может быть архивирован.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    specialty_id = curriculum.specialty_id
+    study_semester = curriculum.study_semester
+
+    curriculum.is_archived = True
+    curriculum.save(update_fields=['is_archived'])
+    messages.success(request, 'Учебный план отправлен в архив.')
+    return redirect(
+        f"{reverse('admin_curriculums')}?"
+        f"specialty_id={specialty_id}&"
+        f"study_semester={study_semester}"
+    )
+
+
+@staff_member_required
+@require_POST
 def admin_curriculum_item_add(request, curriculum_id):
     curriculum = get_object_or_404(
         SpecialtyCurriculum,
