@@ -186,18 +186,16 @@ class SpecialtyCurriculum(models.Model):
 
 
 class SpecialtyCurriculumItem(models.Model):
-    curriculum = models.ForeignKey(SpecialtyCurriculum, on_delete=models.CASCADE, null=True, blank=True, related_name='items', verbose_name="Учебный план")
-    specialty = models.ForeignKey(Specialty, on_delete=models.CASCADE, verbose_name="Специальность")
-    study_semester = models.PositiveSmallIntegerField(verbose_name="Семестр обучения")
+    curriculum = models.ForeignKey(SpecialtyCurriculum, on_delete=models.CASCADE, related_name='items', verbose_name="Учебный план")
     plan = models.ForeignKey(DisciplinePlan, on_delete=models.PROTECT, limit_choices_to={'is_approved': True}, verbose_name="План дисциплины")
 
     def __str__(self):
-        return f"{self.specialty} — {self.study_semester} семестр — {self.plan}"
+        return f"{self.curriculum} — {self.plan}"
 
     class Meta:
         verbose_name = "Дисциплина учебного плана специальности"
         verbose_name_plural = "Дисциплины учебных планов специальностей"
-        unique_together = ['specialty', 'study_semester', 'plan']
+        unique_together = ['curriculum', 'plan']
 
 
 class Teacher(models.Model):
