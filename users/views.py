@@ -1212,7 +1212,9 @@ def admin_dashboard(request):
 
 @staff_member_required
 def admin_semesters(request):
-    semesters = AcademicSemester.objects.select_related('status').order_by('-start_date')
+    semesters = AcademicSemester.objects.select_related('status').annotate(
+        discipline_count=Count('discipline')
+    ).order_by('-start_date')
 
     search = request.GET.get('search', '')
     if search:
@@ -1297,6 +1299,13 @@ def admin_semester_edit(request, semester_id):
         messages.error(request, 'Изменять можно только черновик семестра.')
         return redirect('admin_semesters')
 
+    if Discipline.objects.filter(semester=semester).exists():
+        messages.error(
+            request,
+            'Подготовленный семестр нельзя изменять.'
+        )
+        return redirect('admin_semesters')
+
     start_year = semester.start_year
     semester_number = str(semester.number)
     start_date = semester.start_date.strftime('%Y-%m-%d')
@@ -1348,6 +1357,8 @@ def admin_semester_curriculums(request, semester_id):
             'Выбирать учебные планы можно только для черновика семестра.'
         )
         return redirect('admin_semesters')
+
+    is_prepared = Discipline.objects.filter(semester=semester).exists()
 
     selections = {}
 
@@ -1401,9 +1412,22 @@ def admin_semester_curriculums(request, semester_id):
             'available_curriculums': available_curriculums.get(key, []),
         })
 
+    required_count = len(curriculum_rows)
+    selected_count = 0
+
+    for row in curriculum_rows:
+        if row['curriculum']:
+            selected_count += 1
+
+    can_prepare = required_count > 0 and selected_count == required_count and not is_prepared
+
     context = {
         'semester': semester,
         'curriculum_rows': curriculum_rows,
+        'is_prepared': is_prepared,
+        'required_count': required_count,
+        'selected_count': selected_count,
+        'can_prepare': can_prepare,
     }
     return render(request, 'users/admin/semester_curriculums.html', context)
 
@@ -1422,6 +1446,13 @@ def admin_semester_curriculum_select(request, semester_id):
             'Выбирать учебные планы можно только для черновика семестра.'
         )
         return redirect('admin_semesters')
+
+    if Discipline.objects.filter(semester=semester).exists():
+        messages.error(
+            request,
+            'После подготовки семестра изменять учебные планы нельзя.'
+        )
+        return redirect('admin_semester_curriculums', semester_id=semester.id)
 
     try:
         specialty_id = int(request.POST.get('specialty_id'))
@@ -1483,6 +1514,115 @@ def admin_semester_curriculum_select(request, semester_id):
         for message in error.messages:
             messages.error(request, message)
 
+    return redirect('admin_semester_curriculums', semester_id=semester.id)
+
+
+@staff_member_required
+@require_POST
+def admin_semester_prepare(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Подготовить можно только черновик семестра.'
+        )
+        return redirect('admin_semesters')
+
+    if Discipline.objects.filter(semester=semester).exists():
+        messages.error(request, 'Семестр уже подготовлен.')
+        return redirect('admin_semester_curriculums', semester_id=semester.id)
+
+    selections = {}
+
+    for selection in semester.curriculum_selections.select_related('curriculum'):
+        key = (
+            selection.curriculum.specialty_id,
+            selection.curriculum.study_semester
+        )
+        selections[key] = selection.curriculum
+
+    groups = Group.objects.filter(
+        is_graduated=False
+    ).select_related('specialty')
+
+    disciplines = []
+
+    for group in groups:
+        study_semester = group.get_study_semester(semester)
+
+        if study_semester < 1 or study_semester > group.specialty.duration_semesters:
+            continue
+
+        key = (group.specialty_id, study_semester)
+        curriculum = selections.get(key)
+
+        if (
+                not curriculum
+                or not curriculum.is_approved
+                or curriculum.is_archived
+        ):
+            messages.error(
+                request,
+                f'Не выбран доступный учебный план для специальности '
+                f'{group.specialty.code}, {study_semester} семестр.'
+            )
+            return redirect(
+                'admin_semester_curriculums',
+                semester_id=semester.id
+            )
+
+        items = curriculum.items.select_related('plan')
+
+        if not items.exists():
+            messages.error(
+                request,
+                f'Учебный план «{curriculum.name}» не содержит дисциплин.'
+            )
+            return redirect(
+                'admin_semester_curriculums',
+                semester_id=semester.id
+            )
+
+        if items.exclude(
+                plan__is_approved=True,
+                plan__is_archived=False
+        ).exists():
+            messages.error(
+                request,
+                f'Учебный план «{curriculum.name}» содержит недоступные дисциплины.'
+            )
+            return redirect(
+                'admin_semester_curriculums',
+                semester_id=semester.id
+            )
+
+        for item in items:
+            disciplines.append(Discipline(
+                plan=item.plan,
+                group=group,
+                semester=semester,
+                teacher=None,
+                is_confirmed=False
+            ))
+
+    if not disciplines:
+        messages.error(
+            request,
+            'Для этого семестра нет дисциплин для подготовки.'
+        )
+        return redirect('admin_semester_curriculums', semester_id=semester.id)
+
+    with transaction.atomic():
+        Discipline.objects.bulk_create(disciplines)
+
+    messages.success(
+        request,
+        f'Семестр подготовлен. Добавлено дисциплин: {len(disciplines)}.'
+    )
     return redirect('admin_semester_curriculums', semester_id=semester.id)
 
 

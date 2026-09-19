@@ -23,6 +23,16 @@
     </div>
 
     <div class="card-body">
+        {% if is_prepared %}
+            <div class="alert alert-success">
+                Семестр подготовлен. Состав дисциплин зафиксирован.
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                Выбрано учебных планов: {{ selected_count }} из {{ required_count }}.
+            </div>
+        {% endif %}
+
         <div class="table-responsive">
             <table class="table table-hover align-middle">
                 <thead>
@@ -38,7 +48,15 @@
                             <td>{{ row.specialty.code }} — {{ row.specialty.name }}</td>
                             <td>{{ row.study_semester }}</td>
                             <td>
-                                {% if row.available_curriculums %}
+                                {% if is_prepared %}
+
+                                    {% if row.curriculum %}
+                                        {{ row.curriculum.name }}
+                                    {% else %}
+                                        <span class="text-muted">Не выбран</span>
+                                    {% endif %}
+
+                                {% elif row.available_curriculums %}
                                     <form method="post" action="{% url 'admin_semester_curriculum_select' semester.id %}" class="d-flex gap-2">
                                         {% csrf_token %}
 
@@ -74,6 +92,16 @@
                 </tbody>
             </table>
         </div>
+
+        {% if not is_prepared %}
+            <form method="post" action="{% url 'admin_semester_prepare' semester.id %}" class="d-inline">
+                {% csrf_token %}
+
+                <button type="submit" class="btn btn-success" {% if not can_prepare %}disabled{% endif %} onclick="return confirm('Подготовить семестр? После этого изменить состав дисциплин будет нельзя.')">
+                    <i class="bi bi-check-circle"></i> Подготовить семестр
+                </button>
+            </form>
+        {% endif %}
 
         <a href="{% url 'admin_semesters' %}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Назад

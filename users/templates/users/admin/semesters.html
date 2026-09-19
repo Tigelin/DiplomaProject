@@ -57,9 +57,12 @@
                         <td>{{ semester.status.name }}</td>
                         <td class="text-end">
                             {% if semester.status.code == 'DRAFT' %}
-                                <a href="{% url 'admin_semester_edit' semester.id %}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-pencil"></i>
-                                </a>
+                                {% if not semester.discipline_count %}
+                                    <a href="{% url 'admin_semester_edit' semester.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                {% endif %}
+
                                 <a href="{% url 'admin_semester_curriculums' semester.id %}" class="btn btn-sm btn-outline-secondary" title="Учебные планы">
                                     <i class="bi bi-list-check"></i>
                                 </a>
