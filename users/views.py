@@ -1437,7 +1437,7 @@ def admin_semester_curriculums(request, semester_id):
             if not row['curriculum']
         ]
 
-    paginator = Paginator(curriculum_rows, 12)
+    paginator = Paginator(curriculum_rows, 10)
     curriculum_rows = paginator.get_page(request.GET.get('page'))
     page_range = paginator.get_elided_page_range(
         curriculum_rows.number,
@@ -1464,7 +1464,7 @@ def admin_semester_curriculums(request, semester_id):
 
 @staff_member_required
 @require_POST
-def admin_semester_curriculum_select(request, semester_id):
+def admin_semester_curriculums_save(request, semester_id):
     semester = get_object_or_404(
         AcademicSemester.objects.select_related('status'),
         id=semester_id
@@ -1477,74 +1477,134 @@ def admin_semester_curriculum_select(request, semester_id):
         )
         return redirect('admin_semesters')
 
+    page_number = request.POST.get('page')
+
+    if not page_number:
+
+        if request.POST.get('save') == '1':
+            page_number = request.POST.get('current_page') or '1'
+        else:
+            page_number = '1'
+
+    try:
+        page_number = max(int(page_number), 1)
+    except (TypeError, ValueError):
+        page_number = 1
+
+    search = request.POST.get('search', '').strip()
+    show_unassigned = request.POST.get('show_unassigned') == '1'
+
+    redirect_url = reverse(
+        'admin_semester_curriculums',
+        args=[semester.id]
+    )
+    query_parts = [f'page={page_number}']
+
+    if search:
+        query_parts.append(f'search={quote(search, safe="")}')
+
+    if show_unassigned:
+        query_parts.append('show_unassigned=1')
+
+    query_string = '&'.join(query_parts)
+    redirect_url = f'{redirect_url}?{query_string}'
+
     if Discipline.objects.filter(semester=semester).exists():
         messages.error(
             request,
             'После подготовки семестра изменять учебные планы нельзя.'
         )
-        return redirect('admin_semester_curriculums', semester_id=semester.id)
+        return redirect(redirect_url)
 
-    try:
-        specialty_id = int(request.POST.get('specialty_id'))
-        study_semester = int(request.POST.get('study_semester'))
-    except (TypeError, ValueError):
-        messages.error(request, 'Переданы неверные данные.')
-        return redirect('admin_semester_curriculums', semester_id=semester.id)
-
-    is_required = False
+    curriculums_to_save = []
+    added_pairs = set()
     groups = Group.objects.filter(
-        specialty_id=specialty_id,
         is_graduated=False
-    ).select_related('specialty')
-
-    for group in groups:
-        group_study_semester = group.get_study_semester(semester)
-
-        if (
-                group_study_semester == study_semester
-                and 1 <= study_semester <= group.specialty.duration_semesters
-        ):
-            is_required = True
-            break
-
-    if not is_required:
-        messages.error(
-            request,
-            'Для выбранной специальности этот учебный план не требуется.'
-        )
-        return redirect('admin_semester_curriculums', semester_id=semester.id)
-
-    curriculum = get_object_or_404(
-        SpecialtyCurriculum,
-        id=request.POST.get('curriculum_id'),
-        specialty_id=specialty_id,
-        study_semester=study_semester,
-        is_approved=True,
-        is_archived=False
+    ).select_related(
+        'specialty'
     )
 
-    selection = semester.curriculum_selections.filter(
-        curriculum__specialty_id=specialty_id,
-        curriculum__study_semester=study_semester
-    ).first()
+    for group in groups:
+        study_semester = group.get_study_semester(semester)
 
-    if selection:
-        selection.curriculum = curriculum
-    else:
-        selection = AcademicSemesterCurriculum(
-            semester=semester,
-            curriculum=curriculum
+        if study_semester < 1 or study_semester > group.specialty.duration_semesters:
+            continue
+
+        key = (group.specialty_id, study_semester)
+
+        if key in added_pairs:
+            continue
+
+        added_pairs.add(key)
+
+        field_name = (
+            f'curriculum_{group.specialty_id}_{study_semester}'
         )
+        curriculum_id = request.POST.get(field_name)
+
+        if not curriculum_id:
+            continue
+
+        curriculum = SpecialtyCurriculum.objects.filter(
+            id=curriculum_id,
+            specialty_id=group.specialty_id,
+            study_semester=study_semester,
+            is_approved=True,
+            is_archived=False
+        ).first()
+
+        if not curriculum:
+            messages.error(
+                request,
+                'Передан недоступный учебный план.'
+            )
+            return redirect(redirect_url)
+
+        curriculums_to_save.append((
+            key,
+            curriculum
+        ))
+
+    if not curriculums_to_save:
+
+        if request.POST.get('save') == '1':
+            messages.error(
+                request,
+                'Выберите хотя бы один учебный план.'
+            )
+
+        return redirect(redirect_url)
 
     try:
-        selection.full_clean()
-        selection.save()
-        messages.success(request, 'Учебный план выбран.')
+        with transaction.atomic():
+            for key, curriculum in curriculums_to_save:
+                specialty_id, study_semester = key
+
+                selection = semester.curriculum_selections.filter(
+                    curriculum__specialty_id=specialty_id,
+                    curriculum__study_semester=study_semester
+                ).first()
+
+                if selection:
+                    selection.curriculum = curriculum
+                else:
+                    selection = AcademicSemesterCurriculum(
+                        semester=semester,
+                        curriculum=curriculum
+                    )
+
+                selection.full_clean()
+                selection.save()
     except ValidationError as error:
         for message in error.messages:
             messages.error(request, message)
+    else:
+        messages.success(
+            request,
+            f'Сохранено учебных планов: {len(curriculums_to_save)}.'
+        )
 
-    return redirect('admin_semester_curriculums', semester_id=semester.id)
+    return redirect(redirect_url)
 
 
 @staff_member_required
