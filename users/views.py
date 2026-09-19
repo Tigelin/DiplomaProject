@@ -1419,6 +1419,32 @@ def admin_semester_curriculums(request, semester_id):
         if row['curriculum']:
             selected_count += 1
 
+    search = request.GET.get('search', '')
+    show_unassigned = request.GET.get('show_unassigned') == '1'
+
+    if search:
+        curriculum_rows = [
+            row for row in curriculum_rows
+            if (
+                    search.lower() in row['specialty'].name.lower()
+                    or search.lower() in row['specialty'].code.lower()
+            )
+        ]
+
+    if show_unassigned:
+        curriculum_rows = [
+            row for row in curriculum_rows
+            if not row['curriculum']
+        ]
+
+    paginator = Paginator(curriculum_rows, 12)
+    curriculum_rows = paginator.get_page(request.GET.get('page'))
+    page_range = paginator.get_elided_page_range(
+        curriculum_rows.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
     can_prepare = required_count > 0 and selected_count == required_count and not is_prepared
 
     context = {
@@ -1428,6 +1454,10 @@ def admin_semester_curriculums(request, semester_id):
         'required_count': required_count,
         'selected_count': selected_count,
         'can_prepare': can_prepare,
+        'search': search,
+        'show_unassigned': show_unassigned,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
     }
     return render(request, 'users/admin/semester_curriculums.html', context)
 
