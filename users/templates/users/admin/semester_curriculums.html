@@ -38,10 +38,29 @@
                             <td>{{ row.specialty.code }} — {{ row.specialty.name }}</td>
                             <td>{{ row.study_semester }}</td>
                             <td>
-                                {% if row.curriculum %}
-                                    {{ row.curriculum.name }}
+                                {% if row.available_curriculums %}
+                                    <form method="post" action="{% url 'admin_semester_curriculum_select' semester.id %}" class="d-flex gap-2">
+                                        {% csrf_token %}
+
+                                        <input type="hidden" name="specialty_id" value="{{ row.specialty.id }}">
+                                        <input type="hidden" name="study_semester" value="{{ row.study_semester }}">
+
+                                        <select name="curriculum_id" class="form-select" required>
+                                            <option value="">Выберите учебный план</option>
+
+                                            {% for curriculum in row.available_curriculums %}
+                                                <option value="{{ curriculum.id }}" {% if row.curriculum.id == curriculum.id %}selected{% endif %}>
+                                                    {{ curriculum.name }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="bi bi-save"></i> Сохранить
+                                        </button>
+                                    </form>
                                 {% else %}
-                                    <span class="text-muted">Не выбран</span>
+                                    <span class="text-muted">Нет утверждённых учебных планов</span>
                                 {% endif %}
                             </td>
                         </tr>

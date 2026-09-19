@@ -18,7 +18,8 @@ from journal.models import (
     Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
     Teacher, Classroom, AcademicSemester, AcademicSemesterStatus,
-    Specialty, SpecialtyCurriculum, SpecialtyCurriculumItem
+    Specialty, SpecialtyCurriculum, SpecialtyCurriculumItem,
+    AcademicSemesterCurriculum
 )
 from .forms import LessonFileUploadForm
 from django.urls import reverse
@@ -1357,6 +1358,19 @@ def admin_semester_curriculums(request, semester_id):
         )
         selections[key] = selection.curriculum
 
+    available_curriculums = {}
+
+    for curriculum in SpecialtyCurriculum.objects.filter(
+            is_approved=True,
+            is_archived=False
+    ).order_by('name'):
+        key = (curriculum.specialty_id, curriculum.study_semester)
+
+        if key not in available_curriculums:
+            available_curriculums[key] = []
+
+        available_curriculums[key].append(curriculum)
+
     curriculum_rows = []
     added_pairs = set()
     groups = Group.objects.filter(
@@ -1384,6 +1398,7 @@ def admin_semester_curriculums(request, semester_id):
             'specialty': group.specialty,
             'study_semester': study_semester,
             'curriculum': selections.get(key),
+            'available_curriculums': available_curriculums.get(key, []),
         })
 
     context = {
@@ -1391,6 +1406,84 @@ def admin_semester_curriculums(request, semester_id):
         'curriculum_rows': curriculum_rows,
     }
     return render(request, 'users/admin/semester_curriculums.html', context)
+
+
+@staff_member_required
+@require_POST
+def admin_semester_curriculum_select(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Выбирать учебные планы можно только для черновика семестра.'
+        )
+        return redirect('admin_semesters')
+
+    try:
+        specialty_id = int(request.POST.get('specialty_id'))
+        study_semester = int(request.POST.get('study_semester'))
+    except (TypeError, ValueError):
+        messages.error(request, 'Переданы неверные данные.')
+        return redirect('admin_semester_curriculums', semester_id=semester.id)
+
+    is_required = False
+    groups = Group.objects.filter(
+        specialty_id=specialty_id,
+        is_graduated=False
+    ).select_related('specialty')
+
+    for group in groups:
+        group_study_semester = group.get_study_semester(semester)
+
+        if (
+                group_study_semester == study_semester
+                and 1 <= study_semester <= group.specialty.duration_semesters
+        ):
+            is_required = True
+            break
+
+    if not is_required:
+        messages.error(
+            request,
+            'Для выбранной специальности этот учебный план не требуется.'
+        )
+        return redirect('admin_semester_curriculums', semester_id=semester.id)
+
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=request.POST.get('curriculum_id'),
+        specialty_id=specialty_id,
+        study_semester=study_semester,
+        is_approved=True,
+        is_archived=False
+    )
+
+    selection = semester.curriculum_selections.filter(
+        curriculum__specialty_id=specialty_id,
+        curriculum__study_semester=study_semester
+    ).first()
+
+    if selection:
+        selection.curriculum = curriculum
+    else:
+        selection = AcademicSemesterCurriculum(
+            semester=semester,
+            curriculum=curriculum
+        )
+
+    try:
+        selection.full_clean()
+        selection.save()
+        messages.success(request, 'Учебный план выбран.')
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+
+    return redirect('admin_semester_curriculums', semester_id=semester.id)
 
 
 @staff_member_required

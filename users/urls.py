@@ -26,6 +26,7 @@ urlpatterns = [
     path('admin/semester/create/', views.admin_semester_create, name='admin_semester_create'),
     path('admin/semester/edit/<int:semester_id>/', views.admin_semester_edit, name='admin_semester_edit'),
     path('admin/semester/<int:semester_id>/curriculums/', views.admin_semester_curriculums, name='admin_semester_curriculums'),
+    path('admin/semester/<int:semester_id>/curriculum/select/', views.admin_semester_curriculum_select, name='admin_semester_curriculum_select'),
     path('admin/curriculums/', views.admin_curriculums, name='admin_curriculums'),
     path('admin/curriculum/create/', views.admin_curriculum_create, name='admin_curriculum_create'),
     path('admin/curriculum/edit/<int:curriculum_id>/', views.admin_curriculum_edit, name='admin_curriculum_edit'),
