@@ -2613,7 +2613,11 @@ def admin_schedule_create(request):
         'plan',
         'group',
         'teacher__user'
-    ).filter(group=selected_group)
+    ).filter(
+        group=selected_group,
+        semester__status__code='OPEN',
+        is_confirmed=True
+    )
 
     classrooms = Classroom.objects.all()
 
@@ -2621,6 +2625,13 @@ def admin_schedule_create(request):
         f"{reverse('schedule_list')}?group_id={selected_group.id}"
         f"&date={initial_date}&manage=1"
     )
+
+    if not disciplines.exists():
+        messages.error(
+            request,
+            'В выбранной группе нет подтверждённых дисциплин открытого семестра.'
+        )
+        return redirect(return_url)
 
     context = {
         'disciplines': disciplines,
@@ -2641,7 +2652,9 @@ def admin_schedule_create(request):
         discipline = get_object_or_404(
             Discipline,
             id=discipline_id,
-            group=selected_group
+            group=selected_group,
+            semester__status__code='OPEN',
+            is_confirmed=True
         )
 
         classroom = get_object_or_404(
@@ -2656,6 +2669,24 @@ def admin_schedule_create(request):
         context['initial_lesson_number'] = lesson_number
 
         try:
+            schedule_date = datetime.strptime(date, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            messages.error(request, 'Введите корректную дату занятия.')
+            return render(request, 'users/admin/schedule_form.html', context)
+
+        if (
+            schedule_date < discipline.semester.start_date or
+            schedule_date > discipline.semester.end_date
+        ):
+            messages.error(
+                request,
+                f'Дата занятия должна быть в период с '
+                f'{discipline.semester.start_date.strftime("%d.%m.%Y")} по '
+                f'{discipline.semester.end_date.strftime("%d.%m.%Y")}.'
+            )
+            return render(request, 'users/admin/schedule_form.html', context)
+
+        try:
             lesson_number = int(lesson_number)
             if lesson_number < 1 or lesson_number > 7:
                 messages.error(request, 'Номер пары должен быть от 1 до 7.')
@@ -2667,7 +2698,7 @@ def admin_schedule_create(request):
         classroom_conflicts, teacher_conflicts = get_schedule_conflicts(
             discipline,
             classroom,
-            date,
+            schedule_date,
             lesson_number
         )
 
@@ -2689,7 +2720,7 @@ def admin_schedule_create(request):
         schedule = Schedule.objects.create(
             discipline=discipline,
             classroom=classroom,
-            date=date,
+            date=schedule_date,
             lesson_number=lesson_number
         )
         messages.success(request, 'Расписание добавлено.')

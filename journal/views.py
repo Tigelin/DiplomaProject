@@ -225,7 +225,9 @@ def schedule_list(request):
     week_schedule = [(week_days[i], week_dates[i]) for i in range(7)]
     lesson_numbers = list(range(1, 8))
 
+    manage_mode = request.GET.get('manage') == '1' and request.user.is_staff
     schedule_grid = {}
+    schedule_creation_days = []
 
     if selected_group:
         schedules = Schedule.objects.filter(
@@ -244,7 +246,21 @@ def schedule_list(request):
                 schedule_grid[weekday] = {}
             schedule_grid[weekday][s.lesson_number] = s
 
-    manage_mode = request.GET.get('manage') == '1' and request.user.is_staff
+        if manage_mode:
+            semester_periods = Discipline.objects.filter(
+                group=selected_group,
+                semester__status__code='OPEN',
+                is_confirmed=True
+            ).values_list(
+                'semester__start_date',
+                'semester__end_date'
+            ).distinct()
+
+            for i, date in enumerate(week_dates):
+                for start_date, end_date in semester_periods:
+                    if start_date <= date <= end_date:
+                        schedule_creation_days.append(i)
+                        break
 
     context = {
         'groups': groups,
@@ -252,6 +268,7 @@ def schedule_list(request):
         'week_schedule': week_schedule,
         'lesson_numbers': lesson_numbers,
         'schedule_grid': schedule_grid,
+        'schedule_creation_days': schedule_creation_days,
         'range_0_6': range(7),
         'today_index': today_index,
         'week_offset': week_offset,

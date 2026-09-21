@@ -169,10 +169,14 @@
 
                                         {% elif manage_mode %}
 
-                                            <a href="{% url 'admin_schedule_create' %}?group_id={{ selected_group.id }}&date={{ week_dates_by_index|get_by_key:i|date:'Y-m-d' }}&lesson_number={{ num }}"
-                                               class="btn btn-sm btn-outline-primary my-2">
-                                                <i class="bi bi-plus"></i> Добавить занятие
-                                            </a>
+                                            {% if i in schedule_creation_days %}
+                                                <a href="{% url 'admin_schedule_create' %}?group_id={{ selected_group.id }}&date={{ week_dates_by_index|get_by_key:i|date:'Y-m-d' }}&lesson_number={{ num }}"
+                                                   class="btn btn-sm btn-outline-primary my-2">
+                                                    <i class="bi bi-plus"></i> Добавить занятие
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">—</span>
+                                            {% endif %}
 
                                         {% else %}
                                             <span class="text-muted">—</span>
