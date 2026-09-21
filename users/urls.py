@@ -25,6 +25,7 @@ urlpatterns = [
     path('admin/semesters/', views.admin_semesters, name='admin_semesters'),
     path('admin/semester/create/', views.admin_semester_create, name='admin_semester_create'),
     path('admin/semester/edit/<int:semester_id>/', views.admin_semester_edit, name='admin_semester_edit'),
+    path('admin/semester/<int:semester_id>/delete/', views.admin_semester_delete, name='admin_semester_delete'),
     path('admin/semester/<int:semester_id>/curriculums/', views.admin_semester_curriculums, name='admin_semester_curriculums'),
     path('admin/semester/<int:semester_id>/curriculums/save/', views.admin_semester_curriculums_save, name='admin_semester_curriculums_save'),
     path('admin/semester/<int:semester_id>/prepare/', views.admin_semester_prepare, name='admin_semester_prepare'),

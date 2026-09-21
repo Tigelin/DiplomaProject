@@ -1345,6 +1345,43 @@ def admin_semester_edit(request, semester_id):
 
 
 @staff_member_required
+@require_POST
+def admin_semester_delete(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Удалить можно только черновик семестра.'
+        )
+        return redirect('admin_semesters')
+
+    disciplines = Discipline.objects.filter(semester=semester)
+
+    if Schedule.objects.filter(discipline__in=disciplines).exists():
+        messages.error(
+            request,
+            'Нельзя удалить семестр, так как для него уже создано расписание.'
+        )
+        return redirect('admin_semesters')
+
+    semester_name = str(semester)
+
+    with transaction.atomic():
+        disciplines.delete()
+        semester.delete()
+
+    messages.success(
+        request,
+        f'Черновик семестра «{semester_name}» удалён.'
+    )
+    return redirect('admin_semesters')
+
+
+@staff_member_required
 def admin_semester_curriculums(request, semester_id):
     semester = get_object_or_404(
         AcademicSemester.objects.select_related('status'),

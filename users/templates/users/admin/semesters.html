@@ -72,6 +72,14 @@
                                         <i class="bi bi-person-check"></i>
                                     </a>
                                 {% endif %}
+
+                                <form method="post" action="{% url 'admin_semester_delete' semester.id %}" class="d-inline" onsubmit="return confirm('Удалить черновик семестра? Подготовленные дисциплины также будут удалены.')">
+                                    {% csrf_token %}
+
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}
