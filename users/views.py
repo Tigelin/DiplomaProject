@@ -2745,13 +2745,21 @@ def admin_schedule_create(request):
 
 @staff_member_required
 def admin_schedule_edit(request, schedule_id):
-    schedule = get_object_or_404(Schedule.objects.select_related('discipline__semester'), id=schedule_id)
-    has_lesson = Lesson.objects.filter(schedule=schedule).exists()
+    schedule = get_object_or_404(Schedule.objects.select_related('discipline__semester__status'), id=schedule_id)
     return_url = (
         f"{reverse('schedule_list')}?semester_id={schedule.discipline.semester_id}"
         f"&group_id={schedule.discipline.group_id}"
         f"&date={schedule.date.strftime('%Y-%m-%d')}&manage=1"
     )
+
+    if schedule.discipline.semester.status.code != 'OPEN':
+        messages.error(
+            request,
+            'Изменять расписание можно только в открытом семестре.'
+        )
+        return redirect(return_url)
+
+    has_lesson = Lesson.objects.filter(schedule=schedule).exists()
     disciplines = Discipline.objects.select_related(
         'plan',
         'group',
@@ -2855,7 +2863,7 @@ def admin_schedule_edit(request, schedule_id):
 def admin_schedule_delete(request, schedule_id):
     schedule = get_object_or_404(
         Schedule.objects.select_related(
-            'discipline__semester'
+            'discipline__semester__status'
         ),
         id=schedule_id
     )
@@ -2863,6 +2871,18 @@ def admin_schedule_delete(request, schedule_id):
     semester_id = schedule.discipline.semester_id
     group_id = schedule.discipline.group_id
     date = schedule.date.strftime('%Y-%m-%d')
+
+    return_url = (
+        f"{reverse('schedule_list')}?semester_id={semester_id}"
+        f"&group_id={group_id}&date={date}&manage=1"
+    )
+
+    if schedule.discipline.semester.status.code != 'OPEN':
+        messages.error(
+            request,
+            'Изменять расписание можно только в открытом семестре.'
+        )
+        return redirect(return_url)
 
     if Lesson.objects.filter(schedule=schedule).exists():
         messages.error(
@@ -2873,10 +2893,7 @@ def admin_schedule_delete(request, schedule_id):
 
     schedule.delete()
     messages.success(request, 'Расписание удалено.')
-    return redirect(
-        f"{reverse('schedule_list')}?semester_id={semester_id}"
-        f"&group_id={group_id}&date={date}&manage=1"
-    )
+    return redirect(return_url)
 
 
 @staff_member_required

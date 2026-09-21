@@ -185,12 +185,12 @@
                         <tr>
                             <th class="bg-light">{{ num|to_roman }}</th>
                             {% for i in range_0_6 %}
-                                <td class="align-middle {% if manage_mode %}p-0{% endif %} {% if i == today_index %}bg-info bg-opacity-25{% endif %}">
+                                <td class="align-middle {% if manage_mode and selected_semester.status.code == 'OPEN' %}p-0{% endif %} {% if i == today_index %}bg-info bg-opacity-25{% endif %}">
                                     {% with schedule_grid|get_by_key:i|get_by_key:num as s %}
 
                                         {% if s %}
 
-                                            {% if manage_mode %}
+                                            {% if manage_mode and selected_semester.status.code == 'OPEN' %}
 
                                                 <a href="{% url 'admin_schedule_edit' s.id %}"
                                                    class="d-block p-2 text-decoration-none text-reset">
@@ -207,7 +207,7 @@
                                                 {% endif %}
                                             </div>
 
-                                            {% if manage_mode %}
+                                            {% if manage_mode and selected_semester.status.code == 'OPEN' %}
 
                                                 <div class="small text-primary mt-1">
                                                     <i class="bi bi-pencil"></i> Редактировать
