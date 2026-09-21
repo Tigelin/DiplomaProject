@@ -8,7 +8,7 @@ from django.contrib import messages
 from .models import (
     Teacher, Department, Group, Discipline,
     Specialty, Schedule, ContactMessage, MessageStatus,
-    DisciplinePlan
+    DisciplinePlan, AcademicSemester
 )
 from django.db.models import Q
 from django.core.paginator import Paginator
@@ -187,29 +187,119 @@ def specialties_list(request):
 
 
 def schedule_list(request):
-    groups = Group.objects.all()
-    group_id = request.GET.get('group_id')
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).select_related('status').order_by('-start_date')
+
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    groups = Group.objects.none()
     selected_group = None
 
-    if group_id:
-        selected_group = get_object_or_404(Group, id=group_id)
+    if selected_semester:
+        groups = Group.objects.filter(
+            discipline__semester=selected_semester
+        ).select_related(
+            'specialty'
+        ).distinct()
 
-    week_offset = int(request.GET.get('week_offset', 0))
+    group_id = request.GET.get('group_id')
+    if group_id and selected_semester:
+        selected_group = get_object_or_404(
+            groups,
+            id=group_id
+        )
+
+    groups = list(groups)
+    for group in groups:
+        group.display_name = group.get_display_name(selected_semester)
+
+    groups.sort(
+        key=lambda group: (
+            group.specialty.name,
+            group.display_name,
+            group.year,
+        )
+    )
+
+    if selected_group:
+        selected_group.display_name = selected_group.get_display_name(
+            selected_semester
+        )
+
+    try:
+        week_offset = int(request.GET.get('week_offset', 0))
+    except (ValueError, TypeError):
+        week_offset = 0
+
     selected_date = request.GET.get('date', '')
-
     week_days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
 
     today = timezone.localdate()
     target_date = today
+    first_monday = None
+    last_monday = None
+    last_sunday = None
+
+    if selected_semester:
+        first_monday = (
+            selected_semester.start_date -
+            timedelta(days=selected_semester.start_date.weekday())
+        )
+        last_monday = (
+            selected_semester.end_date -
+            timedelta(days=selected_semester.end_date.weekday())
+        )
+        last_sunday = last_monday + timedelta(days=6)
+
+        if today < first_monday or today > last_sunday:
+            target_date = selected_semester.start_date
 
     if selected_date:
         try:
-            target_date = datetime.strptime(selected_date, '%Y-%m-%d').date()
+            target_date = datetime.strptime(
+                selected_date,
+                '%Y-%m-%d'
+            ).date()
+
+            if selected_semester:
+                if target_date < selected_semester.start_date:
+                    target_date = selected_semester.start_date
+                    selected_date = selected_semester.start_date.strftime(
+                        '%Y-%m-%d'
+                    )
+                elif target_date > selected_semester.end_date:
+                    target_date = selected_semester.end_date
+                    selected_date = selected_semester.end_date.strftime(
+                        '%Y-%m-%d'
+                    )
         except ValueError:
             selected_date = ''
 
-    target_date += timedelta(weeks=week_offset)
-    monday = target_date - timedelta(days=target_date.weekday())
+    base_monday = target_date - timedelta(days=target_date.weekday())
+
+    if selected_semester:
+        minimum_week_offset = (
+            first_monday - base_monday
+        ).days // 7
+        maximum_week_offset = (
+            last_monday - base_monday
+        ).days // 7
+        week_offset = max(
+            minimum_week_offset,
+            min(week_offset, maximum_week_offset)
+        )
+    else:
+        week_offset = 0
+
+    monday = base_monday + timedelta(weeks=week_offset)
     week_dates = [monday + timedelta(days=i) for i in range(7)]
 
     current_monday = today - timedelta(days=today.weekday())
@@ -229,9 +319,10 @@ def schedule_list(request):
     schedule_grid = {}
     schedule_creation_days = []
 
-    if selected_group:
+    if selected_group and selected_semester:
         schedules = Schedule.objects.filter(
             discipline__group=selected_group,
+            discipline__semester=selected_semester,
             date__gte=monday,
             date__lte=monday + timedelta(days=6)
         ).select_related(
@@ -246,23 +337,25 @@ def schedule_list(request):
                 schedule_grid[weekday] = {}
             schedule_grid[weekday][s.lesson_number] = s
 
-        if manage_mode:
-            semester_periods = Discipline.objects.filter(
+        if (
+            manage_mode and
+            selected_semester.status.code == 'OPEN' and
+            Discipline.objects.filter(
                 group=selected_group,
-                semester__status__code='OPEN',
+                semester=selected_semester,
                 is_confirmed=True
-            ).values_list(
-                'semester__start_date',
-                'semester__end_date'
-            ).distinct()
-
+            ).exists()
+        ):
             for i, date in enumerate(week_dates):
-                for start_date, end_date in semester_periods:
-                    if start_date <= date <= end_date:
-                        schedule_creation_days.append(i)
-                        break
+                if (
+                    selected_semester.start_date <= date <=
+                    selected_semester.end_date
+                ):
+                    schedule_creation_days.append(i)
 
     context = {
+        'semesters': semesters,
+        'selected_semester': selected_semester,
         'groups': groups,
         'selected_group': selected_group,
         'week_schedule': week_schedule,
@@ -276,6 +369,16 @@ def schedule_list(request):
         'selected_date': selected_date,
         'is_current_week': is_current_week,
         'manage_mode': manage_mode,
+        'has_previous_week': (
+            selected_semester and monday > first_monday
+        ),
+        'has_next_week': (
+            selected_semester and monday < last_monday
+        ),
+        'return_to_first_week': (
+            selected_semester and
+            (today < first_monday or today > last_sunday)
+        ),
         'week_dates_by_index': {
             i: date for i, date in enumerate(week_dates)
         },

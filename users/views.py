@@ -2590,12 +2590,13 @@ def get_schedule_conflicts(
 
 @staff_member_required
 def admin_schedule_create(request):
+    semester_id = request.GET.get('semester_id')
     group_id = request.GET.get('group_id')
 
-    if not group_id:
+    if not semester_id or not group_id:
         messages.error(
             request,
-            'Сначала выберите группу в расписании.'
+            'Сначала выберите семестр и группу в расписании.'
         )
         return redirect(
             f"{reverse('schedule_list')}?manage=1"
@@ -2604,26 +2605,35 @@ def admin_schedule_create(request):
     initial_date = request.GET.get('date', '')
     initial_lesson_number = request.GET.get('lesson_number', '')
 
+    selected_semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id,
+        status__code='OPEN'
+    )
+
     selected_group = get_object_or_404(
-        Group,
+        Group.objects.filter(
+            discipline__semester=selected_semester
+        ).distinct(),
         id=group_id
     )
 
     disciplines = Discipline.objects.select_related(
         'plan',
         'group',
-        'teacher__user'
+        'teacher__user',
+        'semester'
     ).filter(
         group=selected_group,
-        semester__status__code='OPEN',
+        semester=selected_semester,
         is_confirmed=True
     )
 
     classrooms = Classroom.objects.all()
 
     return_url = (
-        f"{reverse('schedule_list')}?group_id={selected_group.id}"
-        f"&date={initial_date}&manage=1"
+        f"{reverse('schedule_list')}?semester_id={selected_semester.id}"
+        f"&group_id={selected_group.id}&date={initial_date}&manage=1"
     )
 
     if not disciplines.exists():
@@ -2641,6 +2651,7 @@ def admin_schedule_create(request):
         'return_url': return_url,
         'reset_url': request.get_full_path(),
         'selected_group': selected_group,
+        'selected_semester': selected_semester,
     }
 
     if request.method == 'POST':
@@ -2653,7 +2664,7 @@ def admin_schedule_create(request):
             Discipline,
             id=discipline_id,
             group=selected_group,
-            semester__status__code='OPEN',
+            semester=selected_semester,
             is_confirmed=True
         )
 
@@ -2725,7 +2736,8 @@ def admin_schedule_create(request):
         )
         messages.success(request, 'Расписание добавлено.')
         return redirect(
-            f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
+            f"{reverse('schedule_list')}?semester_id={selected_semester.id}"
+            f"&group_id={schedule.discipline.group_id}&date={date}&manage=1"
         )
 
     return render(request, 'users/admin/schedule_form.html', context)
@@ -2733,13 +2745,22 @@ def admin_schedule_create(request):
 
 @staff_member_required
 def admin_schedule_edit(request, schedule_id):
-    schedule = get_object_or_404(Schedule, id=schedule_id)
+    schedule = get_object_or_404(Schedule.objects.select_related('discipline__semester'), id=schedule_id)
     has_lesson = Lesson.objects.filter(schedule=schedule).exists()
     return_url = (
-        f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}"
+        f"{reverse('schedule_list')}?semester_id={schedule.discipline.semester_id}"
+        f"&group_id={schedule.discipline.group_id}"
         f"&date={schedule.date.strftime('%Y-%m-%d')}&manage=1"
     )
-    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').filter(group=schedule.discipline.group)
+    disciplines = Discipline.objects.select_related(
+        'plan',
+        'group',
+        'teacher__user',
+        'semester'
+    ).filter(
+        group=schedule.discipline.group,
+        semester=schedule.discipline.semester
+    )
     classrooms = Classroom.objects.all()
 
     context = {
@@ -2759,7 +2780,8 @@ def admin_schedule_edit(request, schedule_id):
             discipline = get_object_or_404(
                 Discipline,
                 id=request.POST.get('discipline_id'),
-                group=schedule.discipline.group
+                group=schedule.discipline.group,
+                semester=schedule.discipline.semester
             )
 
         classroom_id = request.POST.get('classroom_id')
@@ -2821,16 +2843,24 @@ def admin_schedule_edit(request, schedule_id):
         schedule.save()
         messages.success(request, 'Расписание обновлено.')
         return redirect(
-            f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
+            f"{reverse('schedule_list')}?semester_id={schedule.discipline.semester_id}"
+            f"&group_id={schedule.discipline.group_id}&date={date}&manage=1"
         )
+
     return render(request, 'users/admin/schedule_form.html', context)
 
 
 @staff_member_required
 @require_POST
 def admin_schedule_delete(request, schedule_id):
-    schedule = get_object_or_404(Schedule, id=schedule_id)
+    schedule = get_object_or_404(
+        Schedule.objects.select_related(
+            'discipline__semester'
+        ),
+        id=schedule_id
+    )
 
+    semester_id = schedule.discipline.semester_id
     group_id = schedule.discipline.group_id
     date = schedule.date.strftime('%Y-%m-%d')
 
@@ -2844,7 +2874,8 @@ def admin_schedule_delete(request, schedule_id):
     schedule.delete()
     messages.success(request, 'Расписание удалено.')
     return redirect(
-        f"{reverse('schedule_list')}?group_id={group_id}&date={date}&manage=1"
+        f"{reverse('schedule_list')}?semester_id={semester_id}"
+        f"&group_id={group_id}&date={date}&manage=1"
     )
 
 
