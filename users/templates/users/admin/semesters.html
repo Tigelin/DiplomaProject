@@ -80,6 +80,19 @@
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
+                            {% elif semester.status.code == 'OPEN' %}
+                                <form method="post"
+                                      action="{% url 'admin_semester_close' semester.id %}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Закрыть учебный семестр?')">
+                                    {% csrf_token %}
+
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-warning"
+                                            title="Закрыть">
+                                        <i class="bi bi-lock"></i>
+                                    </button>
+                                </form>
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}

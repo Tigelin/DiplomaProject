@@ -2064,6 +2064,36 @@ def admin_semester_open(request, semester_id):
 
 
 @staff_member_required
+@require_POST
+def admin_semester_close(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'OPEN':
+        messages.error(
+            request,
+            'Закрыть можно только открытый семестр.'
+        )
+        return redirect('admin_semesters')
+
+    closed_status = get_object_or_404(
+        AcademicSemesterStatus,
+        code='CLOSED'
+    )
+
+    semester.status = closed_status
+    semester.save(update_fields=['status'])
+
+    messages.success(
+        request,
+        'Учебный семестр закрыт.'
+    )
+    return redirect('admin_semesters')
+
+
+@staff_member_required
 def admin_curriculums(request):
     specialties = Specialty.objects.order_by('name')
     selected_specialty = None
