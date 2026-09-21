@@ -49,9 +49,13 @@
                         <td>{{ discipline.group.name }}</td>
                         <td>{{ discipline.teacher.user.get_full_name }}</td>
                         <td>
-                            <a href="{% url 'admin_discipline_edit' discipline.id %}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-pencil"></i>
-                            </a>
+                            {% if discipline.semester.status.code != 'CLOSED' %}
+                                <a href="{% url 'admin_discipline_edit' discipline.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

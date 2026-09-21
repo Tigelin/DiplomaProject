@@ -2953,6 +2953,7 @@ def admin_disciplines(request):
         'plan',
         'group',
         'teacher__user',
+        'semester__status',
     ).order_by(
         'plan__name',
         'group__name',
@@ -2984,26 +2985,57 @@ def admin_disciplines(request):
     }
     return render(request, 'users/admin/disciplines.html', context)
 
+
 @staff_member_required
 def admin_discipline_edit(request, discipline_id):
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline.objects.select_related('semester__status'),
+        id=discipline_id
+    )
 
-    if request.method == 'POST':
-        discipline.plan_id = request.POST.get('plan_id')
-        discipline.group_id = request.POST.get('group_id')
-        discipline.teacher_id = request.POST.get('teacher_id')
-        discipline.save()
-        messages.success(request, 'Дисциплина обновлена.')
+    if discipline.semester.status.code == 'CLOSED':
+        messages.error(
+            request,
+            'Дисциплины закрытого семестра доступны только для просмотра.'
+        )
         return redirect('admin_disciplines')
 
-    plans = DisciplinePlan.objects.filter(Q(is_approved=True, is_archived=False) | Q(id=discipline.plan_id))
-    groups = Group.objects.all()
+    if request.method == 'POST':
+        teacher_id = request.POST.get('teacher_id')
+        teacher = None
+
+        if teacher_id:
+            try:
+                teacher = Teacher.objects.get(id=teacher_id)
+            except (Teacher.DoesNotExist, ValueError):
+                messages.error(
+                    request,
+                    'Выбран недоступный преподаватель.'
+                )
+                return redirect(
+                    'admin_discipline_edit',
+                    discipline_id=discipline.id
+                )
+
+        if discipline.semester.status.code == 'OPEN' and not teacher:
+            messages.error(
+                request,
+                'У дисциплины открытого семестра должен быть преподаватель.'
+            )
+            return redirect(
+                'admin_discipline_edit',
+                discipline_id=discipline.id
+            )
+
+        discipline.teacher = teacher
+        discipline.save(update_fields=['teacher'])
+        messages.success(request, 'Преподаватель дисциплины обновлён.')
+        return redirect('admin_disciplines')
+
     teachers = Teacher.objects.select_related('user').all()
 
     context = {
         'discipline': discipline,
-        'plans': plans,
-        'groups': groups,
         'teachers': teachers,
     }
     return render(request, 'users/admin/discipline_form.html', context)
