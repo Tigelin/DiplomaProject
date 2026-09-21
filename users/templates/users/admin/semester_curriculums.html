@@ -23,7 +23,7 @@
     </div>
 
     <div class="card-body">
-        {% if is_prepared %}
+        {% if not is_editable %}
             <div class="alert alert-success">
                 Семестр подготовлен. Состав дисциплин зафиксирован.
             </div>
@@ -33,7 +33,7 @@
             </div>
         {% endif %}
 
-            {% if is_prepared %}
+            {% if not is_editable %}
 
             <form method="get">
         {% else %}
@@ -79,10 +79,12 @@
                                     <td>{{ row.specialty.code }} — {{ row.specialty.name }}</td>
                                     <td>{{ row.study_semester }}</td>
                                     <td>
-                                        {% if is_prepared %}
+                                        {% if not is_editable %}
 
                                             {% if row.curriculum %}
-                                                {{ row.curriculum.name }}
+                                                <a href="{% url 'admin_curriculum_detail' row.curriculum.id %}">
+                                                    {{ row.curriculum.name }}
+                                                </a>
                                             {% else %}
                                                 <span class="text-muted">Не выбран</span>
                                             {% endif %}
@@ -163,7 +165,7 @@
 
         <div class="d-flex flex-wrap gap-2 mt-3">
 
-            {% if not is_prepared %}
+            {% if is_editable %}
 
                 {% if curriculum_rows %}
                     <button type="submit" form="semesterCurriculumsForm" name="save" value="1" class="btn btn-primary">

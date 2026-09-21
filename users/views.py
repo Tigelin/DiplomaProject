@@ -1388,18 +1388,17 @@ def admin_semester_curriculums(request, semester_id):
         id=semester_id
     )
 
-    if semester.status.code != 'DRAFT':
-        messages.error(
-            request,
-            'Выбирать учебные планы можно только для черновика семестра.'
-        )
-        return redirect('admin_semesters')
-
     is_prepared = Discipline.objects.filter(semester=semester).exists()
+    is_editable = semester.status.code == 'DRAFT' and not is_prepared
 
     selections = {}
 
-    for selection in semester.curriculum_selections.select_related('curriculum'):
+    for selection in semester.curriculum_selections.select_related(
+            'curriculum__specialty'
+    ).order_by(
+        'curriculum__specialty__name',
+        'curriculum__study_semester'
+    ):
         key = (
             selection.curriculum.specialty_id,
             selection.curriculum.study_semester
@@ -1408,46 +1407,63 @@ def admin_semester_curriculums(request, semester_id):
 
     available_curriculums = {}
 
-    for curriculum in SpecialtyCurriculum.objects.filter(
-            is_approved=True,
-            is_archived=False
-    ).order_by('name'):
-        key = (curriculum.specialty_id, curriculum.study_semester)
+    if is_editable:
+        for curriculum in SpecialtyCurriculum.objects.filter(
+                is_approved=True,
+                is_archived=False
+        ).order_by('name'):
+            key = (
+                curriculum.specialty_id,
+                curriculum.study_semester
+            )
 
-        if key not in available_curriculums:
-            available_curriculums[key] = []
+            if key not in available_curriculums:
+                available_curriculums[key] = []
 
-        available_curriculums[key].append(curriculum)
+            available_curriculums[key].append(curriculum)
 
     curriculum_rows = []
-    added_pairs = set()
-    groups = Group.objects.filter(
-        is_graduated=False
-    ).select_related(
-        'specialty'
-    ).order_by(
-        'specialty__name',
-        'year'
-    )
 
-    for group in groups:
-        study_semester = group.get_study_semester(semester)
+    if not is_editable:
+        for curriculum in selections.values():
+            curriculum_rows.append({
+                'specialty': curriculum.specialty,
+                'study_semester': curriculum.study_semester,
+                'curriculum': curriculum,
+                'available_curriculums': [],
+            })
+    else:
+        added_pairs = set()
+        groups = Group.objects.filter(
+            is_graduated=False
+        ).select_related(
+            'specialty'
+        ).order_by(
+            'specialty__name',
+            'year'
+        )
 
-        if study_semester < 1 or study_semester > group.specialty.duration_semesters:
-            continue
+        for group in groups:
+            study_semester = group.get_study_semester(semester)
 
-        key = (group.specialty_id, study_semester)
+            if (
+                    study_semester < 1
+                    or study_semester > group.specialty.duration_semesters
+            ):
+                continue
 
-        if key in added_pairs:
-            continue
+            key = (group.specialty_id, study_semester)
 
-        added_pairs.add(key)
-        curriculum_rows.append({
-            'specialty': group.specialty,
-            'study_semester': study_semester,
-            'curriculum': selections.get(key),
-            'available_curriculums': available_curriculums.get(key, []),
-        })
+            if key in added_pairs:
+                continue
+
+            added_pairs.add(key)
+            curriculum_rows.append({
+                'specialty': group.specialty,
+                'study_semester': study_semester,
+                'curriculum': selections.get(key),
+                'available_curriculums': available_curriculums.get(key, []),
+            })
 
     required_count = len(curriculum_rows)
     selected_count = 0
@@ -1482,12 +1498,12 @@ def admin_semester_curriculums(request, semester_id):
         on_ends=1,
     )
 
-    can_prepare = required_count > 0 and selected_count == required_count and not is_prepared
+    can_prepare = required_count > 0 and selected_count == required_count and is_editable
 
     context = {
         'semester': semester,
         'curriculum_rows': curriculum_rows,
-        'is_prepared': is_prepared,
+        'is_editable': is_editable,
         'required_count': required_count,
         'selected_count': selected_count,
         'can_prepare': can_prepare,

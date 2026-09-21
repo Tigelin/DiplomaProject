@@ -62,21 +62,32 @@
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                 {% endif %}
+                            {% endif %}
 
-                                <a href="{% url 'admin_semester_curriculums' semester.id %}" class="btn btn-sm btn-outline-secondary" title="Учебные планы">
-                                    <i class="bi bi-list-check"></i>
-                                </a>
+                            <a href="{% url 'admin_semester_curriculums' semester.id %}"
+                               class="btn btn-sm btn-outline-secondary"
+                               title="Учебные планы">
+                                <i class="bi bi-list-check"></i>
+                            </a>
 
+                            {% if semester.status.code == 'DRAFT' %}
                                 {% if semester.discipline_count %}
-                                    <a href="{% url 'admin_semester_disciplines' semester.id %}" class="btn btn-sm btn-outline-success" title="Преподаватели">
+                                    <a href="{% url 'admin_semester_disciplines' semester.id %}"
+                                       class="btn btn-sm btn-outline-success"
+                                       title="Преподаватели">
                                         <i class="bi bi-person-check"></i>
                                     </a>
                                 {% endif %}
 
-                                <form method="post" action="{% url 'admin_semester_delete' semester.id %}" class="d-inline" onsubmit="return confirm('Удалить черновик семестра? Подготовленные дисциплины также будут удалены.')">
+                                <form method="post"
+                                      action="{% url 'admin_semester_delete' semester.id %}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Удалить черновик семестра? Подготовленные дисциплины также будут удалены.')">
                                     {% csrf_token %}
 
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить">
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-danger"
+                                            title="Удалить">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </form>
@@ -93,8 +104,6 @@
                                         <i class="bi bi-lock"></i>
                                     </button>
                                 </form>
-                            {% else %}
-                                <span class="text-muted">—</span>
                             {% endif %}
                         </td>
                     </tr>
