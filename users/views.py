@@ -1754,6 +1754,7 @@ def admin_semester_disciplines(request, semester_id):
 
     total_count = disciplines.count()
     assigned_count = disciplines.exclude(teacher__isnull=True).count()
+    can_open = total_count > 0 and assigned_count == total_count
     search = request.GET.get('search', '')
     show_unassigned = request.GET.get('show_unassigned') == '1'
 
@@ -1795,6 +1796,7 @@ def admin_semester_disciplines(request, semester_id):
         'show_unassigned': show_unassigned,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'can_open': can_open,
     }
     return render(
         request,
@@ -1909,6 +1911,119 @@ def admin_semester_disciplines_save(request, semester_id):
         )
 
     return redirect(redirect_url)
+
+
+@staff_member_required
+@require_POST
+def admin_semester_open(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Открыть можно только черновик семестра.'
+        )
+        return redirect('admin_semesters')
+
+    disciplines = Discipline.objects.filter(
+        semester=semester
+    ).select_related(
+        'group__specialty',
+        'group__number_set'
+    )
+
+    if not disciplines.exists():
+        messages.error(
+            request,
+            'Сначала подготовьте дисциплины семестра.'
+        )
+        return redirect(
+            'admin_semester_curriculums',
+            semester_id=semester.id
+        )
+
+    if disciplines.filter(teacher__isnull=True).exists():
+        messages.error(
+            request,
+            'Перед открытием семестра назначьте преподавателей всем дисциплинам.'
+        )
+        return redirect(
+            'admin_semester_disciplines',
+            semester_id=semester.id
+        )
+
+    try:
+        semester.full_clean()
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+
+        return redirect(
+            'admin_semester_disciplines',
+            semester_id=semester.id
+        )
+
+    groups = {}
+
+    for discipline in disciplines:
+        groups[discipline.group_id] = discipline.group
+
+    for group in groups.values():
+        study_semester = group.get_study_semester(semester)
+
+        if (
+                study_semester < 1
+                or study_semester > group.specialty.duration_semesters
+        ):
+            messages.error(
+                request,
+                f'Для группы {group.name} вычислен недоступный семестр обучения.'
+            )
+            return redirect(
+                'admin_semester_disciplines',
+                semester_id=semester.id
+            )
+
+        if group.number_set.specialty_id != group.specialty_id:
+            messages.error(
+                request,
+                f'Для группы {group.name} выбран комплект номеров другой специальности.'
+            )
+            return redirect(
+                'admin_semester_disciplines',
+                semester_id=semester.id
+            )
+
+        course = group.get_course(semester)
+
+        if not group.number_set.entries.filter(course=course).exists():
+            messages.error(
+                request,
+                f'В комплекте номеров группы {group.name} отсутствует номер для {course} курса.'
+            )
+            return redirect(
+                'admin_semester_disciplines',
+                semester_id=semester.id
+            )
+
+    open_status = get_object_or_404(
+        AcademicSemesterStatus,
+        code='OPEN'
+    )
+
+    with transaction.atomic():
+        disciplines.update(is_confirmed=True)
+        semester.status = open_status
+        semester.save(update_fields=['status'])
+
+    messages.success(
+        request,
+        'Учебный семестр открыт. Все дисциплины подтверждены.'
+    )
+    return redirect('admin_semesters')
 
 
 @staff_member_required

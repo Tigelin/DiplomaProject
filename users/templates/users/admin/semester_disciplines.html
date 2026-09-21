@@ -146,6 +146,14 @@
                 </button>
             {% endif %}
 
+            <form method="post" action="{% url 'admin_semester_open' semester.id %}" class="d-inline">
+                {% csrf_token %}
+
+                <button type="submit" class="btn btn-success" {% if not can_open %}disabled{% endif %} onclick="return confirm('Открыть семестр? Все дисциплины будут подтверждены.')">
+                    <i class="bi bi-check-circle"></i> Открыть семестр
+                </button>
+            </form>
+
             <a href="{% url 'admin_semesters' %}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Назад
             </a>
