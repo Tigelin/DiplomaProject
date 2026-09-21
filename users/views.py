@@ -1717,6 +1717,201 @@ def admin_semester_prepare(request, semester_id):
 
 
 @staff_member_required
+def admin_semester_disciplines(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Назначать преподавателей можно только для черновика семестра.'
+        )
+        return redirect('admin_semesters')
+
+    disciplines = Discipline.objects.filter(
+        semester=semester
+    ).select_related(
+        'plan',
+        'group__specialty',
+        'teacher__user'
+    ).order_by(
+        'group__specialty__name',
+        'group__name',
+        'plan__name'
+    )
+
+    if not disciplines.exists():
+        messages.error(
+            request,
+            'Сначала подготовьте дисциплины семестра.'
+        )
+        return redirect(
+            'admin_semester_curriculums',
+            semester_id=semester.id
+        )
+
+    total_count = disciplines.count()
+    assigned_count = disciplines.exclude(teacher__isnull=True).count()
+    search = request.GET.get('search', '')
+    show_unassigned = request.GET.get('show_unassigned') == '1'
+
+    if search:
+        disciplines = disciplines.filter(
+            Q(plan__name__icontains=search) |
+            Q(group__name__icontains=search) |
+            Q(group__specialty__name__icontains=search) |
+            Q(group__specialty__code__icontains=search) |
+            Q(teacher__user__last_name__icontains=search) |
+            Q(teacher__user__first_name__icontains=search) |
+            Q(teacher__user__patronymic__icontains=search)
+        )
+
+    if show_unassigned:
+        disciplines = disciplines.filter(teacher__isnull=True)
+
+    paginator = Paginator(disciplines, 10)
+    disciplines = paginator.get_page(request.GET.get('page'))
+    page_range = paginator.get_elided_page_range(
+        disciplines.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
+    teachers = Teacher.objects.select_related('user').order_by(
+        'user__last_name',
+        'user__first_name',
+        'user__patronymic'
+    )
+
+    context = {
+        'semester': semester,
+        'disciplines': disciplines,
+        'teachers': teachers,
+        'total_count': total_count,
+        'assigned_count': assigned_count,
+        'search': search,
+        'show_unassigned': show_unassigned,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
+    }
+    return render(
+        request,
+        'users/admin/semester_disciplines.html',
+        context
+    )
+
+
+@staff_member_required
+@require_POST
+def admin_semester_disciplines_save(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Назначать преподавателей можно только для черновика семестра.'
+        )
+        return redirect('admin_semesters')
+
+    page_number = request.POST.get('page')
+
+    if not page_number:
+
+        if request.POST.get('save') == '1':
+            page_number = request.POST.get('current_page') or '1'
+        else:
+            page_number = '1'
+
+    try:
+        page_number = max(int(page_number), 1)
+    except (TypeError, ValueError):
+        page_number = 1
+
+    search = request.POST.get('search', '').strip()
+    show_unassigned = request.POST.get('show_unassigned') == '1'
+
+    redirect_url = reverse(
+        'admin_semester_disciplines',
+        args=[semester.id]
+    )
+    query_parts = [f'page={page_number}']
+
+    if search:
+        query_parts.append(f'search={quote(search, safe="")}')
+
+    if show_unassigned:
+        query_parts.append('show_unassigned=1')
+
+    query_string = '&'.join(query_parts)
+    redirect_url = f'{redirect_url}?{query_string}'
+
+    assignments = []
+
+    for field_name, teacher_id in request.POST.items():
+        if not field_name.startswith('teacher_'):
+            continue
+
+        try:
+            discipline_id = int(field_name.replace('teacher_', '', 1))
+        except ValueError:
+            messages.error(request, 'Передана неверная дисциплина.')
+            return redirect(redirect_url)
+
+        discipline = Discipline.objects.filter(
+            id=discipline_id,
+            semester=semester
+        ).first()
+
+        if not discipline:
+            messages.error(
+                request,
+                'Передана дисциплина другого семестра.'
+            )
+            return redirect(redirect_url)
+
+        teacher = None
+
+        if teacher_id:
+            teacher = Teacher.objects.filter(id=teacher_id).first()
+
+            if not teacher:
+                messages.error(
+                    request,
+                    'Передан недоступный преподаватель.'
+                )
+                return redirect(redirect_url)
+
+        assignments.append((discipline, teacher))
+
+    if not assignments:
+        if request.POST.get('save') == '1':
+            messages.error(
+                request,
+                'На странице нет дисциплин для сохранения.'
+            )
+
+        return redirect(redirect_url)
+
+    with transaction.atomic():
+        for discipline, teacher in assignments:
+            discipline.teacher = teacher
+            discipline.save(update_fields=['teacher'])
+
+    if request.POST.get('save') == '1':
+        messages.success(
+            request,
+            f'Сохранено дисциплин: {len(assignments)}.'
+        )
+
+    return redirect(redirect_url)
+
+
+@staff_member_required
 def admin_curriculums(request):
     specialties = Specialty.objects.order_by('name')
     selected_specialty = None
