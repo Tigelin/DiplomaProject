@@ -2984,34 +2984,6 @@ def admin_disciplines(request):
     }
     return render(request, 'users/admin/disciplines.html', context)
 
-
-@staff_member_required
-def admin_discipline_create(request):
-    if request.method == 'POST':
-        plan_id = request.POST.get('plan_id')
-        group_id = request.POST.get('group_id')
-        teacher_id = request.POST.get('teacher_id')
-
-        Discipline.objects.create(
-            plan_id=plan_id,
-            group_id=group_id,
-            teacher_id=teacher_id
-        )
-        messages.success(request, 'Дисциплина добавлена.')
-        return redirect('admin_disciplines')
-
-    plans = DisciplinePlan.objects.filter(is_approved=True, is_archived=False)
-    groups = Group.objects.all()
-    teachers = Teacher.objects.select_related('user').all()
-
-    context = {
-        'plans': plans,
-        'groups': groups,
-        'teachers': teachers,
-    }
-    return render(request, 'users/admin/discipline_form.html', context)
-
-
 @staff_member_required
 def admin_discipline_edit(request, discipline_id):
     discipline = get_object_or_404(Discipline, id=discipline_id)
@@ -3035,16 +3007,3 @@ def admin_discipline_edit(request, discipline_id):
         'teachers': teachers,
     }
     return render(request, 'users/admin/discipline_form.html', context)
-
-
-@staff_member_required
-def admin_discipline_delete(request, discipline_id):
-    discipline = get_object_or_404(Discipline, id=discipline_id)
-
-    if Schedule.objects.filter(discipline=discipline).exists():
-        messages.error(request, 'Нельзя удалить дисциплину, так как она используется в расписании.')
-        return redirect('admin_disciplines')
-
-    discipline.delete()
-    messages.success(request, 'Дисциплина удалена.')
-    return redirect('admin_disciplines')
