@@ -3338,28 +3338,54 @@ def admin_disciplines(request):
             status__code='DRAFT'
         ).first()
 
-    disciplines = Discipline.objects.none()
+    disciplines = []
+    search = request.GET.get('search', '')
 
     if selected_semester:
-        disciplines = Discipline.objects.filter(
+        available_disciplines = Discipline.objects.filter(
             semester=selected_semester
         ).select_related(
             'plan',
-            'group',
+            'group__number_set',
             'teacher__user',
             'semester__status',
-        ).order_by(
-            'plan__name',
-            'group__name',
         )
 
-    search = request.GET.get('search', '')
-    if search:
-        disciplines = disciplines.filter(
-            Q(plan__name__icontains=search) |
-            Q(group__name__icontains=search) |
-            Q(teacher__user__last_name__icontains=search) |
-            Q(teacher__user__first_name__icontains=search)
+        group_names = {}
+        search_value = search.lower()
+
+        for discipline in available_disciplines:
+            if discipline.group_id not in group_names:
+                group_names[discipline.group_id] = (
+                    discipline.group.get_display_name(selected_semester)
+                )
+
+            discipline.group.display_name = group_names[
+                discipline.group_id
+            ]
+
+            if search:
+                teacher_name = ''
+
+                if discipline.teacher:
+                    teacher_name = (
+                        discipline.teacher.user.get_full_name().lower()
+                    )
+
+                if not (
+                    search_value in discipline.plan.name.lower()
+                    or search_value in discipline.group.display_name.lower()
+                    or search_value in teacher_name
+                ):
+                    continue
+
+            disciplines.append(discipline)
+
+        disciplines.sort(
+            key=lambda discipline: (
+                discipline.plan.name,
+                discipline.group.display_name,
+            )
         )
 
     paginator = Paginator(disciplines, 12)
@@ -3370,12 +3396,6 @@ def admin_disciplines(request):
         on_each_side=2,
         on_ends=1,
     )
-
-    if selected_semester:
-        for discipline in disciplines:
-            discipline.group.display_name = discipline.group.get_display_name(
-                selected_semester
-            )
 
     context = {
         'disciplines': disciplines,
