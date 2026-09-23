@@ -8,7 +8,7 @@
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
     <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Личный кабинет</a></li>
     <li class="breadcrumb-item"><a href="{% url 'teacher_groups' %}">Мои группы</a></li>
-    <li class="breadcrumb-item active">{{ discipline.plan.name }} ({{ discipline.group.name }})</li>
+    <li class="breadcrumb-item active">{{ discipline.plan.name }} ({{ discipline.group.display_name }})</li>
 
 {% endblock %}
 
@@ -17,7 +17,7 @@
 <div class="card">
     <div class="card-header bg-primary text-white">
         <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill"></i> Журнал оценок - {{ discipline.plan.name }}</h4>
-        <small>Группа: {{ discipline.group.name }}</small>
+        <small>Группа: {{ discipline.group.display_name }}</small>
     </div>
     <div class="card-body">
         {% if is_read_only %}

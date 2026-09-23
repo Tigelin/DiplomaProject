@@ -364,6 +364,9 @@ class Discipline(models.Model):
     semester = models.ForeignKey(AcademicSemester, on_delete=models.PROTECT, verbose_name="Учебный семестр")
     is_confirmed = models.BooleanField(default=False, verbose_name="Подтверждена")
 
+    def get_group_display_name(self):
+        return self.group.get_display_name(self.semester)
+
     def __str__(self):
         return f"{self.plan.name} - {self.group.name}"
 

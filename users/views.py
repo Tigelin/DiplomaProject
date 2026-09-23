@@ -97,8 +97,41 @@ def student_profile(request):
         messages.success(request, 'Профиль успешно обновлён!')
         return redirect('student_profile')
 
+    memberships = student.group_memberships.filter(
+        start_date__lte=OuterRef('end_date')
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=OuterRef('start_date'))
+    )
+
+    selected_semester = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).annotate(
+        has_membership=Exists(memberships)
+    ).filter(
+        has_membership=True
+    ).order_by('-start_date').first()
+
+    group_name = ''
+
+    if selected_semester:
+        membership = student.group_memberships.filter(
+            start_date__lte=selected_semester.end_date
+        ).filter(
+            Q(end_date__isnull=True) |
+            Q(end_date__gte=selected_semester.start_date)
+        ).select_related(
+            'group__number_set'
+        ).order_by('-start_date').first()
+
+        if membership:
+            group_name = membership.group.get_display_name(
+                selected_semester
+            )
+
     return render(request, 'users/student/profile.html', {
         'student': student,
+        'group_name': group_name,
     })
 
 
@@ -547,29 +580,50 @@ def teacher_groups(request):
     else:
         selected_semester = semesters.first()
 
-    disciplines = Discipline.objects.none()
+    disciplines = []
+    search = request.GET.get('search', '')
 
     if selected_semester:
-        disciplines = Discipline.objects.filter(
+        available_disciplines = Discipline.objects.filter(
             teacher=teacher,
             semester=selected_semester
         ).select_related(
             'plan',
             'group__specialty',
+            'group__number_set',
         ).annotate(
             actual_hours=Sum('schedule__lesson__hours')
-        ).order_by(
-            '-group__year',
-            'group__name',
-            'plan__name',
         )
 
-    search = request.GET.get('search', '')
-    if search:
-        disciplines = disciplines.filter(
-            Q(plan__name__icontains=search) |
-            Q(group__name__icontains=search) |
-            Q(group__specialty__name__icontains=search)
+        group_names = {}
+        search_value = search.lower()
+
+        for discipline in available_disciplines:
+            if discipline.group_id not in group_names:
+                group_names[discipline.group_id] = (
+                    discipline.get_group_display_name()
+                )
+
+            discipline.group.display_name = group_names[
+                discipline.group_id
+            ]
+
+            if search:
+                if not (
+                    search_value in discipline.plan.name.lower()
+                    or search_value in discipline.group.display_name.lower()
+                    or search_value in discipline.group.specialty.name.lower()
+                ):
+                    continue
+
+            disciplines.append(discipline)
+
+        disciplines.sort(
+            key=lambda discipline: (
+                -discipline.group.year,
+                discipline.group.display_name,
+                discipline.plan.name,
+            )
         )
 
     paginator = Paginator(disciplines, 15)
@@ -580,12 +634,6 @@ def teacher_groups(request):
         on_each_side=2,
         on_ends=1,
     )
-
-    if selected_semester:
-        for discipline in disciplines:
-            discipline.group.display_name = discipline.group.get_display_name(
-                selected_semester
-            )
 
     context = {
         'teacher': teacher,
@@ -610,7 +658,8 @@ def teacher_journal(request, discipline_id):
     discipline = get_object_or_404(
         Discipline.objects.select_related(
             'teacher',
-            'semester__status'
+            'semester__status',
+            'group__number_set',
         ),
         id=discipline_id
     )
@@ -619,6 +668,7 @@ def teacher_journal(request, discipline_id):
         messages.error(request, 'У вас нет доступа к этой дисциплине.')
         return redirect('teacher_groups')
 
+    discipline.group.display_name = discipline.get_group_display_name()
     is_read_only = discipline.semester.status.code == 'CLOSED'
     students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
 
@@ -704,7 +754,8 @@ def teacher_lesson(request, schedule_id):
     schedule = get_object_or_404(
         Schedule.objects.select_related(
             'discipline__teacher',
-            'discipline__semester__status'
+            'discipline__semester__status',
+            'discipline__group__number_set',
         ),
         id=schedule_id
     )
@@ -713,6 +764,7 @@ def teacher_lesson(request, schedule_id):
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
 
+    schedule.discipline.group.display_name = schedule.discipline.get_group_display_name()
     is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
 
     if request.method == 'POST' and is_read_only:
@@ -827,7 +879,8 @@ def teacher_lesson_attendance(request, lesson_id):
     lesson = get_object_or_404(
         Lesson.objects.select_related(
             'schedule__discipline__teacher',
-            'schedule__discipline__semester__status'
+            'schedule__discipline__semester__status',
+            'schedule__discipline__group__number_set',
         ),
         id=lesson_id
     )
@@ -837,6 +890,7 @@ def teacher_lesson_attendance(request, lesson_id):
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
 
+    schedule.discipline.group.display_name = schedule.discipline.get_group_display_name()
     is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
 
     if request.method == 'POST' and is_read_only:
@@ -938,7 +992,8 @@ def teacher_task_grades(request, task_id):
         Task.objects.select_related(
             'task_type',
             'lesson__schedule__discipline__teacher',
-            'lesson__schedule__discipline__semester__status'
+            'lesson__schedule__discipline__semester__status',
+            'lesson__schedule__discipline__group__number_set',
         ),
         id=task_id
     )
@@ -949,6 +1004,7 @@ def teacher_task_grades(request, task_id):
         messages.error(request, 'У вас нет доступа к этому заданию.')
         return redirect('teacher_groups')
 
+    schedule.discipline.group.display_name = schedule.discipline.get_group_display_name()
     is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
 
     if request.method == 'POST' and is_read_only:
@@ -1149,12 +1205,21 @@ def export_journal_excel(request, discipline_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline.objects.select_related(
+            'plan',
+            'group__number_set',
+            'semester',
+            'teacher'
+        ),
+        id=discipline_id
+    )
 
     if discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этой дисциплине.')
         return redirect('teacher_groups')
 
+    group_name = discipline.get_group_display_name()
     students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
 
     schedules = Schedule.objects.filter(
@@ -1203,7 +1268,7 @@ def export_journal_excel(request, discipline_id):
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1 + len(schedules))
     row += 1
 
-    ws.cell(row=row, column=col).value = f"Группа: {discipline.group.name}"
+    ws.cell(row=row, column=col).value = f"Группа: {group_name}"
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1 + len(schedules))
     row += 1
 
@@ -1329,7 +1394,7 @@ def export_journal_excel(request, discipline_id):
         ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 15
 
     current_date = datetime.now().strftime('%d.%m.%Y')
-    filename = f"{discipline.plan.name}_{discipline.group.name}_{current_date}.xlsx"
+    filename = f"{discipline.plan.name}_{group_name}_{current_date}.xlsx"
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
     wb.save(response)
@@ -1344,12 +1409,21 @@ def export_journal_docx(request, discipline_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline.objects.select_related(
+            'plan',
+            'group__number_set',
+            'semester',
+            'teacher'
+        ),
+        id=discipline_id
+    )
 
     if discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этой дисциплине.')
         return redirect('teacher_groups')
 
+    group_name = discipline.get_group_display_name()
     students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
 
     schedules = Schedule.objects.filter(
@@ -1386,7 +1460,7 @@ def export_journal_docx(request, discipline_id):
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     doc.add_paragraph(f'Дисциплина: {discipline.plan.name}')
-    doc.add_paragraph(f'Группа: {discipline.group.name}')
+    doc.add_paragraph(f'Группа: {group_name}')
     doc.add_paragraph(f'Преподаватель: {teacher.user.last_name} {teacher.user.first_name} {teacher.user.patronymic}')
     doc.add_paragraph()
 
@@ -1464,7 +1538,7 @@ def export_journal_docx(request, discipline_id):
                     run.font.size = Pt(10)
 
     current_date = datetime.now().strftime('%d.%m.%Y')
-    filename = f"{discipline.plan.name}_{discipline.group.name}_{current_date}.docx"
+    filename = f"{discipline.plan.name}_{group_name}_{current_date}.docx"
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
@@ -2320,6 +2394,7 @@ def admin_semester_open(request, semester_id):
         groups[discipline.group_id] = discipline.group
 
     for group in groups.values():
+        group_name = group.get_display_name(semester)
         study_semester = group.get_study_semester(semester)
 
         if (
@@ -2328,7 +2403,7 @@ def admin_semester_open(request, semester_id):
         ):
             messages.error(
                 request,
-                f'Для группы {group.name} вычислен недоступный семестр обучения.'
+                f'Для группы {group_name} вычислен недоступный семестр обучения.'
             )
             return redirect(
                 'admin_semester_disciplines',
@@ -2338,7 +2413,7 @@ def admin_semester_open(request, semester_id):
         if group.number_set.specialty_id != group.specialty_id:
             messages.error(
                 request,
-                f'Для группы {group.name} выбран комплект номеров другой специальности.'
+                f'Для группы {group_name} выбран комплект номеров другой специальности.'
             )
             return redirect(
                 'admin_semester_disciplines',
@@ -2350,7 +2425,7 @@ def admin_semester_open(request, semester_id):
         if not group.number_set.entries.filter(course=course).exists():
             messages.error(
                 request,
-                f'В комплекте номеров группы {group.name} отсутствует номер для {course} курса.'
+                f'В комплекте номеров группы {group_name} отсутствует номер для {course} курса.'
             )
             return redirect(
                 'admin_semester_disciplines',
@@ -2867,9 +2942,10 @@ def get_schedule_conflicts(
         lesson_number=lesson_number
     ).select_related(
         'discipline__plan',
-        'discipline__group',
+        'discipline__group__number_set',
+        'discipline__semester',
         'discipline__teacher__user',
-        'classroom'
+        'classroom',
     )
 
     if exclude_schedule_id:
@@ -2912,6 +2988,7 @@ def admin_schedule_create(request):
         ).distinct(),
         id=group_id
     )
+    selected_group.display_name = selected_group.get_display_name(selected_semester)
 
     disciplines = Discipline.objects.select_related(
         'plan',
@@ -3040,7 +3117,13 @@ def admin_schedule_create(request):
 
 @staff_member_required
 def admin_schedule_edit(request, schedule_id):
-    schedule = get_object_or_404(Schedule.objects.select_related('discipline__semester__status'), id=schedule_id)
+    schedule = get_object_or_404(
+        Schedule.objects.select_related(
+            'discipline__semester__status',
+            'discipline__group__number_set'
+        ),
+        id=schedule_id
+    )
     return_url = (
         f"{reverse('schedule_list')}?semester_id={schedule.discipline.semester_id}"
         f"&group_id={schedule.discipline.group_id}"
@@ -3054,6 +3137,7 @@ def admin_schedule_edit(request, schedule_id):
         )
         return redirect(return_url)
 
+    schedule.discipline.group.display_name = schedule.discipline.get_group_display_name()
     has_lesson = Lesson.objects.filter(schedule=schedule).exists()
     disciplines = Discipline.objects.select_related(
         'plan',
@@ -3411,9 +3495,14 @@ def admin_disciplines(request):
 @staff_member_required
 def admin_discipline_edit(request, discipline_id):
     discipline = get_object_or_404(
-        Discipline.objects.select_related('semester__status'),
+        Discipline.objects.select_related(
+            'semester__status',
+            'group__number_set'
+        ),
         id=discipline_id
     )
+
+    discipline.group.display_name = discipline.get_group_display_name()
 
     return_url = (
         f"{reverse('admin_disciplines')}?semester_id={discipline.semester_id}"

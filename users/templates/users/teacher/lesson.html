@@ -52,7 +52,7 @@
 
         <div class="alert alert-info">
             <strong>Дисциплина:</strong> {{ schedule.discipline.plan.name }}<br>
-            <strong>Группа:</strong> {{ schedule.discipline.group.name }}<br>
+            <strong>Группа:</strong> {{ schedule.discipline.group.display_name }}<br>
             <strong>Дата:</strong> {{ schedule.date|date:"d.m.Y" }}<br>
             <strong>Пара:</strong> {{ schedule.lesson_number }}<br>
             <strong>Кабинет:</strong> {{ schedule.classroom.number }}

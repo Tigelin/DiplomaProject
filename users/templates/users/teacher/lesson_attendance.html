@@ -30,7 +30,7 @@
 
         <div class="alert alert-info">
             <strong>Дисциплина:</strong> {{ schedule.discipline.plan.name }}<br>
-            <strong>Группа:</strong> {{ schedule.discipline.group.name }}<br>
+            <strong>Группа:</strong> {{ schedule.discipline.group.display_name }}<br>
             <strong>Дата занятия:</strong> {{ schedule.date|date:"d.m.Y" }}<br>
             <strong>Тема занятия:</strong> {{ lesson.topic|default:"—" }}
         </div>

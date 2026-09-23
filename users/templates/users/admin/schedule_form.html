@@ -27,7 +27,7 @@
     <div class="card-body">
 
         <p class="mb-3">
-            <strong>Группа:</strong> {{ selected_group.name }}
+            <strong>Группа:</strong> {{ selected_group.display_name }}
         </p>
 
         <form method="post">
@@ -119,7 +119,7 @@
                                 {{ conflict.date|date:"d.m.Y" }},
                                 {{ conflict.lesson_number }} пара —
                                 {{ conflict.discipline.plan.name }},
-                                группа {{ conflict.discipline.group.name }},
+                                группа {{ conflict.discipline.get_group_display_name }},
                                 преподаватель
                                 {{ conflict.discipline.teacher.user.get_full_name }}
                             </li>
@@ -144,7 +144,7 @@
                                 {{ conflict.date|date:"d.m.Y" }},
                                 {{ conflict.lesson_number }} пара —
                                 {{ conflict.discipline.plan.name }},
-                                группа {{ conflict.discipline.group.name }},
+                                группа {{ conflict.discipline.get_group_display_name }},
                                 кабинет {{ conflict.classroom.number }}
                             </li>
                         {% endfor %}
