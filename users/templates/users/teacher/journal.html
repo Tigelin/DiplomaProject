@@ -74,8 +74,15 @@
                                         </th>
                                     {% endfor %}
                                 {% elif schedule.has_lesson %}
-                                    <th style="min-width: 80px; vertical-align: top; font-weight: normal; cursor: pointer;" onclick="window.location.href='{% url 'teacher_task_create' schedule.lesson.id %}'">
-                                        <span class="text-white-50">+ задание</span>
+                                    <th style="min-width: 80px; vertical-align: top; font-weight: normal;">
+                                        <form method="post" action="{% url 'teacher_task_create' schedule.lesson.id %}">
+                                            {% csrf_token %}
+
+                                            <button type="submit"
+                                                    class="btn btn-link p-0 text-white-50 text-decoration-none">
+                                                + задание
+                                            </button>
+                                        </form>
                                     </th>
                                 {% else %}
                                     <th class="lesson-start" style="min-width: 80px; vertical-align: top; font-weight: normal; opacity: 0.3;">

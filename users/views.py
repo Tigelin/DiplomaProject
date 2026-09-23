@@ -534,11 +534,27 @@ def teacher_lesson(request, schedule_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    schedule = get_object_or_404(Schedule, id=schedule_id)
+    schedule = get_object_or_404(
+        Schedule.objects.select_related(
+            'discipline__teacher',
+            'discipline__semester__status'
+        ),
+        id=schedule_id
+    )
 
     if schedule.discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
+
+    if request.method == 'POST' and schedule.discipline.semester.status.code == 'CLOSED':
+        messages.error(
+            request,
+            'Закрытый семестр доступен только для просмотра.'
+        )
+        return redirect(
+            'teacher_lesson',
+            schedule_id=schedule.id
+        )
 
     lesson = Lesson.objects.filter(schedule=schedule).first()
     upload_form = LessonFileUploadForm()
@@ -638,12 +654,28 @@ def teacher_lesson_attendance(request, lesson_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson.objects.select_related(
+            'schedule__discipline__teacher',
+            'schedule__discipline__semester__status'
+        ),
+        id=lesson_id
+    )
     schedule = lesson.schedule
 
     if schedule.discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
+
+    if request.method == 'POST' and schedule.discipline.semester.status.code == 'CLOSED':
+        messages.error(
+            request,
+            'Закрытый семестр доступен только для просмотра.'
+        )
+        return redirect(
+            'teacher_lesson_attendance',
+            lesson_id=lesson.id
+        )
 
     students = Student.objects.filter(
         group=schedule.discipline.group
@@ -729,13 +761,30 @@ def teacher_task_grades(request, task_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    task = get_object_or_404(Task.objects.select_related('task_type'), id=task_id)
+    task = get_object_or_404(
+        Task.objects.select_related(
+            'task_type',
+            'lesson__schedule__discipline__teacher',
+            'lesson__schedule__discipline__semester__status'
+        ),
+        id=task_id
+    )
     lesson = task.lesson
     schedule = lesson.schedule
 
     if schedule.discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этому заданию.')
         return redirect('teacher_groups')
+
+    if request.method == 'POST' and schedule.discipline.semester.status.code == 'CLOSED':
+        messages.error(
+            request,
+            'Закрытый семестр доступен только для просмотра.'
+        )
+        return redirect(
+            'teacher_task_grades',
+            task_id=task.id
+        )
 
     students = list(Student.objects.filter(
         group=schedule.discipline.group
@@ -865,6 +914,7 @@ def teacher_task_grades(request, task_id):
 
 
 @login_required
+@require_POST
 def teacher_task_create(request, lesson_id):
     try:
         teacher = request.user.teacher
@@ -872,11 +922,27 @@ def teacher_task_create(request, lesson_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson.objects.select_related(
+            'schedule__discipline__teacher',
+            'schedule__discipline__semester__status'
+        ),
+        id=lesson_id
+    )
 
     if lesson.schedule.discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа.')
         return redirect('teacher_groups')
+
+    if lesson.schedule.discipline.semester.status.code == 'CLOSED':
+        messages.error(
+            request,
+            'Закрытый семестр доступен только для просмотра.'
+        )
+        return redirect(
+            'teacher_journal',
+            discipline_id=lesson.schedule.discipline.id
+        )
 
     task_type = TaskType.objects.order_by('id').first()
 
