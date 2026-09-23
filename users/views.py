@@ -678,7 +678,9 @@ def teacher_lesson_attendance(request, lesson_id):
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
 
-    if request.method == 'POST' and schedule.discipline.semester.status.code == 'CLOSED':
+    is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
+
+    if request.method == 'POST' and is_read_only:
         messages.error(
             request,
             'Закрытый семестр доступен только для просмотра.'
@@ -760,6 +762,7 @@ def teacher_lesson_attendance(request, lesson_id):
         'students': students,
         'attendance_types': attendance_types,
         'attendance_statuses': attendance_statuses,
+        'is_read_only': is_read_only,
     }
     return render(request, 'users/teacher/lesson_attendance.html', context)
 
@@ -787,7 +790,9 @@ def teacher_task_grades(request, task_id):
         messages.error(request, 'У вас нет доступа к этому заданию.')
         return redirect('teacher_groups')
 
-    if request.method == 'POST' and schedule.discipline.semester.status.code == 'CLOSED':
+    is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
+
+    if request.method == 'POST' and is_read_only:
         messages.error(
             request,
             'Закрытый семестр доступен только для просмотра.'
@@ -919,6 +924,7 @@ def teacher_task_grades(request, task_id):
         'attendance_statuses': attendance_statuses,
         'required_student_ids': required_student_ids,
         'task_types': task_types,
+        'is_read_only': is_read_only,
     }
 
     return render(request, 'users/teacher/task_grades.html', context)

@@ -29,13 +29,20 @@
             <strong>Тема занятия:</strong> {{ lesson.topic|default:"—" }}
         </div>
 
+        {% if is_read_only %}
+            <div class="alert alert-secondary">
+                <i class="bi bi-lock"></i>
+                Семестр закрыт. Задание и оценки доступны только для просмотра.
+            </div>
+        {% endif %}
+
         <form method="post">
             {% csrf_token %}
 
             <div class="row">
                 <div class="col-md-4 mb-3">
                     <label class="form-label">Тип задания</label>
-                    <select name="task_type" class="form-select" required>
+                    <select name="task_type" class="form-select" required {% if is_read_only %}disabled{% endif %}>
                         {% for task_type in task_types %}
                             <option value="{{ task_type.id }}"
                                     {% if task_type.id == task.task_type_id %}selected{% endif %}>
@@ -46,26 +53,28 @@
                 </div>
                 <div class="col-md-4 mb-3">
                     <label class="form-label">Название задания</label>
-                    <input type="text" name="task_name" class="form-control" value="{{ task.name }}" required>
+                    <input type="text" name="task_name" class="form-control" value="{{ task.name }}" required {% if is_read_only %}disabled{% endif %}>
                 </div>
                 <div class="col-md-4 mb-3">
                     <label class="form-label">Описание задания</label>
-                    <input type="text" name="task_description" class="form-control" value="{{ task.description }}">
+                    <input type="text" name="task_description" class="form-control" value="{{ task.description }}" {% if is_read_only %}disabled{% endif %}>
                 </div>
             </div>
 
-            <div class="row">
-                <div class="col-md-6">
-                    <button type="submit" name="save_task" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Сохранить задание
-                    </button>
+            {% if not is_read_only %}
+                <div class="row">
+                    <div class="col-md-6">
+                        <button type="submit" name="save_task" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Сохранить задание
+                        </button>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <button type="submit" name="delete_task" class="btn btn-danger" onclick="return confirm('Удалить задание? Все оценки будут потеряны.')">
+                            <i class="bi bi-trash"></i> Удалить задание
+                        </button>
+                    </div>
                 </div>
-                <div class="col-md-6 text-end">
-                    <button type="submit" name="delete_task" class="btn btn-danger" onclick="return confirm('Удалить задание? Все оценки будут потеряны.')">
-                        <i class="bi bi-trash"></i> Удалить задание
-                    </button>
-                </div>
-            </div>
+            {% endif %}
         </form>
 
         <hr>
@@ -76,40 +85,42 @@
             {% csrf_token %}
 
             <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
-                <div class="btn-group" role="group" aria-label="Настройка обязательности задания">
-                    <input type="radio"
-                           class="btn-check"
-                           name="required_action"
-                           id="required_none"
-                           autocomplete="off">
-                    <label class="btn btn-outline-secondary"
-                           for="required_none"
-                           data-required-action="none">
-                        Не обязательно
-                    </label>
+                {% if not is_read_only %}
+                    <div class="btn-group" role="group" aria-label="Настройка обязательности задания">
+                        <input type="radio"
+                               class="btn-check"
+                               name="required_action"
+                               id="required_none"
+                               autocomplete="off">
+                        <label class="btn btn-outline-secondary"
+                               for="required_none"
+                               data-required-action="none">
+                            Не обязательно
+                        </label>
 
-                    <input type="radio"
-                           class="btn-check"
-                           name="required_action"
-                           id="required_present"
-                           autocomplete="off">
-                    <label class="btn btn-outline-primary"
-                           for="required_present"
-                           data-required-action="present">
-                        Обязательно для присутствующих
-                    </label>
+                        <input type="radio"
+                               class="btn-check"
+                               name="required_action"
+                               id="required_present"
+                               autocomplete="off">
+                        <label class="btn btn-outline-primary"
+                               for="required_present"
+                               data-required-action="present">
+                            Обязательно для присутствующих
+                        </label>
 
-                    <input type="radio"
-                           class="btn-check"
-                           name="required_action"
-                           id="required_all"
-                           autocomplete="off">
-                    <label class="btn btn-outline-primary"
-                           for="required_all"
-                           data-required-action="all">
-                        Обязательно для всех
-                    </label>
-                </div>
+                        <input type="radio"
+                               class="btn-check"
+                               name="required_action"
+                               id="required_all"
+                               autocomplete="off">
+                        <label class="btn btn-outline-primary"
+                               for="required_all"
+                               data-required-action="all">
+                            Обязательно для всех
+                        </label>
+                    </div>
+                {% endif %}
 
                 <div class="form-check form-switch ms-md-auto">
                     <input class="form-check-input"
@@ -167,7 +178,8 @@
                                                name="required_{{ student.id }}"
                                                id="required_{{ student.id }}"
                                                class="form-check-input required-checkbox"
-                                               {% if student.id in required_student_ids %}checked{% endif %}>
+                                               {% if student.id in required_student_ids %}checked{% endif %}
+                                               {% if is_read_only %}disabled{% endif %}>
                                         <label class="visually-hidden" for="required_{{ student.id }}">
                                             Обязательное задание для {{ student.user.last_name }} {{ student.user.first_name }}
                                         </label>
@@ -183,7 +195,8 @@
                                                max="5"
                                                step="1"
                                                aria-label="Оценка — {{ student.user.last_name }} {{ student.user.first_name }}"
-                                               style="width: 80px;">
+                                               style="width: 80px;"
+                                               {% if is_read_only %}disabled{% endif %}>
                                     </td>
 
                                 </tr>
@@ -205,9 +218,11 @@
                 <span class="text-danger fw-bold">●</span> — обязательное задание без оценки.
             </div>
 
-            <button type="submit" name="save_grades" class="btn btn-success mt-3">
-                <i class="bi bi-check-circle"></i> Сохранить оценки
-            </button>
+            {% if not is_read_only %}
+                <button type="submit" name="save_grades" class="btn btn-success mt-3">
+                    <i class="bi bi-check-circle"></i> Сохранить оценки
+                </button>
+            {% endif %}
 
             <a href="{% url 'teacher_lesson' lesson.schedule.id %}" class="btn btn-secondary mt-3">
                 <i class="bi bi-arrow-left"></i> Назад к занятию
