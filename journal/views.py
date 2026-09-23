@@ -56,21 +56,58 @@ def departments_list(request):
 
 
 def groups_list(request):
-    groups = Group.objects.select_related(
-        'specialty__department'
-    ).order_by(
-        'specialty__name',
-        'name',
-        'year',
-    )
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).select_related('status').order_by('-start_date')
 
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    groups = []
     search = request.GET.get('search', '')
-    if search:
-        groups = groups.filter(
-            Q(name__icontains=search) |
-            Q(year__icontains=search) |
-            Q(specialty__department__name__icontains=search) |
-            Q(specialty__name__icontains=search)
+
+    if selected_semester:
+        available_groups = Group.objects.select_related(
+            'specialty__department',
+            'number_set',
+        )
+
+        for group in available_groups:
+            study_semester = group.get_study_semester(selected_semester)
+
+            if (
+                study_semester < 1
+                or study_semester > group.specialty.duration_semesters
+            ):
+                continue
+
+            group.display_name = group.get_display_name(selected_semester)
+
+            if search:
+                search_value = search.lower()
+
+                if not (
+                    search_value in group.display_name.lower()
+                    or search_value in str(group.year)
+                    or search_value in group.specialty.name.lower()
+                    or search_value in group.specialty.department.name.lower()
+                ):
+                    continue
+
+            groups.append(group)
+
+        groups.sort(
+            key=lambda group: (
+                group.specialty.name,
+                group.display_name,
+                group.year,
+            )
         )
 
     paginator = Paginator(groups, 15)
@@ -87,6 +124,8 @@ def groups_list(request):
         'search': search,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'journal/groups.html', context)
 
