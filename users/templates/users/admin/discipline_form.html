@@ -8,7 +8,9 @@
 
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
     <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
-    <li class="breadcrumb-item"><a href="{% url 'admin_disciplines' %}">Дисциплины</a></li>
+    <li class="breadcrumb-item">
+        <a href="{% url 'admin_disciplines' %}?semester_id={{ discipline.semester_id }}">Дисциплины</a>
+    </li>
     <li class="breadcrumb-item active">
         Редактирование
     </li>
@@ -61,7 +63,7 @@
                 <i class="bi bi-save"></i> Сохранить
             </button>
 
-            <a href="{% url 'admin_disciplines' %}" class="btn btn-secondary">
+            <a href="{% url 'admin_disciplines' %}?semester_id={{ discipline.semester_id }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Отмена
             </a>
         </form>

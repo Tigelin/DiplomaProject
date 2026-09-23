@@ -3136,15 +3136,35 @@ def admin_discipline_plan_archive(request, plan_id):
 
 @staff_member_required
 def admin_disciplines(request):
-    disciplines = Discipline.objects.select_related(
-        'plan',
-        'group',
-        'teacher__user',
-        'semester__status',
-    ).order_by(
-        'plan__name',
-        'group__name',
-    )
+    semesters = AcademicSemester.objects.select_related(
+        'status'
+    ).order_by('-start_date')
+
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.exclude(
+            status__code='DRAFT'
+        ).first()
+
+    disciplines = Discipline.objects.none()
+
+    if selected_semester:
+        disciplines = Discipline.objects.filter(
+            semester=selected_semester
+        ).select_related(
+            'plan',
+            'group',
+            'teacher__user',
+            'semester__status',
+        ).order_by(
+            'plan__name',
+            'group__name',
+        )
 
     search = request.GET.get('search', '')
     if search:
@@ -3164,11 +3184,19 @@ def admin_disciplines(request):
         on_ends=1,
     )
 
+    if selected_semester:
+        for discipline in disciplines:
+            discipline.group.display_name = discipline.group.get_display_name(
+                selected_semester
+            )
+
     context = {
         'disciplines': disciplines,
         'search': search,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/admin/disciplines.html', context)
 
@@ -3180,12 +3208,16 @@ def admin_discipline_edit(request, discipline_id):
         id=discipline_id
     )
 
+    return_url = (
+        f"{reverse('admin_disciplines')}?semester_id={discipline.semester_id}"
+    )
+
     if discipline.semester.status.code == 'CLOSED':
         messages.error(
             request,
             'Дисциплины закрытого семестра доступны только для просмотра.'
         )
-        return redirect('admin_disciplines')
+        return redirect(return_url)
 
     if request.method == 'POST':
         teacher_id = request.POST.get('teacher_id')
@@ -3217,7 +3249,7 @@ def admin_discipline_edit(request, discipline_id):
         discipline.teacher = teacher
         discipline.save(update_fields=['teacher'])
         messages.success(request, 'Преподаватель дисциплины обновлён.')
-        return redirect('admin_disciplines')
+        return redirect(return_url)
 
     teachers = Teacher.objects.select_related('user').all()
 

@@ -17,8 +17,25 @@
         <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill"></i> Управление дисциплинами</h4>
     </div>
     <div class="card-body">
-        
+        {% if semesters %}
+
+            <form method="get" class="mb-4">
+                <label class="form-label">Выберите учебный семестр:</label>
+                <select name="semester_id" class="form-select" onchange="this.form.submit()">
+                    {% for semester in semesters %}
+                        <option value="{{ semester.id }}" {% if selected_semester.id == semester.id %}selected{% endif %}>
+                            {{ semester }} — {{ semester.status.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+
+        {% endif %}
+
         <form method="get" class="mb-4">
+            {% if selected_semester %}
+                <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+            {% endif %}
             <div class="row g-2">
                 <div class="col-md-8">
                     <input type="text" name="search" class="form-control" placeholder="Поиск по дисциплине, группе или преподавателю..." value="{{ search }}">
@@ -46,7 +63,7 @@
                     {% for discipline in disciplines %}
                     <tr>
                         <td>{{ discipline.plan.name }}</td>
-                        <td>{{ discipline.group.name }}</td>
+                        <td>{{ discipline.group.display_name }}</td>
                         <td>{{ discipline.teacher.user.get_full_name }}</td>
                         <td>
                             {% if discipline.semester.status.code != 'CLOSED' %}
@@ -60,7 +77,9 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center">Нет записей</td>
+                        <td colspan="4" class="text-center">
+                            Дисциплины за выбранный семестр не найдены.
+                        </td>
                     </tr>
                     {% endfor %}
                     
@@ -75,7 +94,7 @@
 
                 {% if disciplines.has_previous %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ disciplines.previous_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                    <a class="page-link" href="?page={{ disciplines.previous_page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if search %}&search={{ search|urlencode }}{% endif %}">
                         Назад
                     </a>
                 </li>
@@ -95,7 +114,7 @@
 
                     {% else %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                        <a class="page-link" href="?page={{ page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if search %}&search={{ search|urlencode }}{% endif %}">
                             {{ page_number }}
                         </a>
                     </li>
@@ -105,7 +124,7 @@
 
                 {% if disciplines.has_next %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ disciplines.next_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                    <a class="page-link" href="?page={{ disciplines.next_page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if search %}&search={{ search|urlencode }}{% endif %}">
                         Вперёд
                     </a>
                 </li>
