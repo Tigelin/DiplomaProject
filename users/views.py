@@ -448,12 +448,19 @@ def teacher_journal(request, discipline_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline.objects.select_related(
+            'teacher',
+            'semester__status'
+        ),
+        id=discipline_id
+    )
 
     if discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этой дисциплине.')
         return redirect('teacher_groups')
 
+    is_read_only = discipline.semester.status.code == 'CLOSED'
     students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
 
     schedules = Schedule.objects.filter(
@@ -522,6 +529,7 @@ def teacher_journal(request, discipline_id):
         'schedules': schedules,
         'grades_matrix': grades_matrix,
         'attendance_matrix': attendance_matrix,
+        'is_read_only': is_read_only,
     }
     return render(request, 'users/teacher/journal.html', context)
 
@@ -546,7 +554,9 @@ def teacher_lesson(request, schedule_id):
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
 
-    if request.method == 'POST' and schedule.discipline.semester.status.code == 'CLOSED':
+    is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
+
+    if request.method == 'POST' and is_read_only:
         messages.error(
             request,
             'Закрытый семестр доступен только для просмотра.'
@@ -642,6 +652,7 @@ def teacher_lesson(request, schedule_id):
         'tasks': tasks,
         'task_types': task_types,
         'upload_form': upload_form,
+        'is_read_only': is_read_only,
     }
     return render(request, 'users/teacher/lesson.html', context)
 

@@ -19,10 +19,12 @@
     <li class="breadcrumb-item"><a href="{% url 'teacher_journal' schedule.discipline.id %}">Журнал оценок</a></li>
     <li class="breadcrumb-item active">
 
-        {% if created %}
-            Новое занятие
+        {% if is_read_only %}
+           Просмотр занятия
+        {% elif created %}
+            Создание занятия
         {% else %}
-            Редактирование
+            Редактирование занятия
         {% endif %}
 
     </li>
@@ -36,7 +38,9 @@
         <h4 class="mb-0">
             <i class="bi bi-calendar-plus"></i>
 
-            {% if created %}
+            {% if is_read_only %}
+               Просмотр занятия
+            {% elif created %}
                 Создание занятия
             {% else %}
                 Редактирование занятия
@@ -54,17 +58,24 @@
             <strong>Кабинет:</strong> {{ schedule.classroom.number }}
         </div>
 
+        {% if is_read_only %}
+            <div class="alert alert-secondary">
+                <i class="bi bi-lock"></i>
+                Семестр закрыт. Занятие доступно только для просмотра.
+            </div>
+        {% endif %}
+
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
 
             <div class="mb-3">
                 <label class="form-label">Тема занятия</label>
-                <input type="text" name="topic" class="form-control" value="{{ lesson.topic }}">
+                <input type="text" name="topic" class="form-control" value="{{ lesson.topic }}" {% if is_read_only %}disabled{% endif %}>
             </div>
 
             <div class="mb-3">
                 <label class="form-label">Тип занятия</label>
-                <select name="lesson_type" class="form-select">
+                <select name="lesson_type" class="form-select" {% if is_read_only %}disabled{% endif %}>
                     <option value="">-- Выберите тип --</option>
 
                     {% for lt in lesson_types %}
@@ -76,48 +87,53 @@
                 </select>
             </div>
 
-            <button type="submit" name="save_lesson" class="btn btn-primary">
-                <i class="bi bi-save"></i> Сохранить занятие
-            </button>
+            {% if not is_read_only %}
+                <button type="submit" name="save_lesson" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Сохранить занятие
+                </button>
+            {% endif %}
         </form>
 
         {% if lesson %}
 
             <a href="{% url 'teacher_lesson_attendance' lesson.id %}" class="btn btn-outline-primary mt-3">
-                <i class="bi bi-person-check"></i> Отметить посещение
+                <i class="bi bi-person-check"></i>
+                {% if is_read_only %}Просмотреть посещаемость{% else %}Отметить посещение{% endif %}
             </a>
 
             <hr>
 
             <h5 class="mt-4">Задания</h5>
 
-            <form method="post" class="mt-3">
-                {% csrf_token %}
+            {% if not is_read_only %}
+                <form method="post" class="mt-3">
+                    {% csrf_token %}
 
-                <div class="row">
-                    <div class="col-md-3">
-                        <select name="task_type" class="form-select" required>
-                            <option value="">Тип задания</option>
-                            {% for task_type in task_types %}
-                                <option value="{{ task_type.id }}">
-                                    {{ task_type }}
-                                </option>
-                            {% endfor %}
-                        </select>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <select name="task_type" class="form-select" required>
+                                <option value="">Тип задания</option>
+                                {% for task_type in task_types %}
+                                    <option value="{{ task_type.id }}">
+                                        {{ task_type }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <input type="text" name="task_name" class="form-control" placeholder="Название задания" required>
+                        </div>
+                        <div class="col-md-3">
+                            <input type="text" name="task_description" class="form-control" placeholder="Описание (необязательно)">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" name="add_task" class="btn btn-success w-100">
+                                <i class="bi bi-plus"></i> Добавить
+                            </button>
+                        </div>
                     </div>
-                    <div class="col-md-4">
-                        <input type="text" name="task_name" class="form-control" placeholder="Название задания" required>
-                    </div>
-                    <div class="col-md-3">
-                        <input type="text" name="task_description" class="form-control" placeholder="Описание (необязательно)">
-                    </div>
-                    <div class="col-md-2">
-                        <button type="submit" name="add_task" class="btn btn-success w-100">
-                            <i class="bi bi-plus"></i> Добавить
-                        </button>
-                    </div>
-                </div>
-            </form>
+                </form>
+            {% endif %}
 
             {% if tasks %}
 
@@ -140,7 +156,8 @@
                                     <td>{{ task.description|default:"—" }}</td>
                                     <td>
                                         <a href="{% url 'teacher_task_grades' task.id %}" class="btn btn-sm btn-outline-primary">
-                                            <i class="bi bi-pencil"></i> Оценки
+                                            <i class="bi {% if is_read_only %}bi-eye{% else %}bi-pencil{% endif %}"></i>
+                                            {% if is_read_only %}Просмотреть{% else %}Оценки{% endif %}
                                         </a>
                                     </td>
                                 </tr>
@@ -160,33 +177,35 @@
 
             <h5 class="mt-4">Файлы к занятию</h5>
 
-            <form method="post" enctype="multipart/form-data" class="mt-3">
-                {% csrf_token %}
+            {% if not is_read_only %}
+                <form method="post" enctype="multipart/form-data" class="mt-3">
+                    {% csrf_token %}
 
-                {% for error in upload_form.non_field_errors %}
-                    <div class="alert alert-danger">{{ error }}</div>
-                {% endfor %}
+                    {% for error in upload_form.non_field_errors %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                    {% endfor %}
 
-                <div class="row">
-                    <div class="col-md-5">
-                        {{ upload_form.file_name }}
-                        {% for error in upload_form.file_name.errors %}
-                            <div class="text-danger small">{{ error }}</div>
-                        {% endfor %}
+                    <div class="row">
+                        <div class="col-md-5">
+                            {{ upload_form.file_name }}
+                            {% for error in upload_form.file_name.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-5">
+                            {{ upload_form.file }}
+                            {% for error in upload_form.file.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" name="upload_file" class="btn btn-success w-100">
+                                <i class="bi bi-upload"></i> Загрузить
+                            </button>
+                        </div>
                     </div>
-                    <div class="col-md-5">
-                        {{ upload_form.file }}
-                        {% for error in upload_form.file.errors %}
-                            <div class="text-danger small">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                    <div class="col-md-2">
-                        <button type="submit" name="upload_file" class="btn btn-success w-100">
-                            <i class="bi bi-upload"></i> Загрузить
-                        </button>
-                    </div>
-                </div>
-            </form>
+                </form>
+            {% endif %}
 
             {% if files %}
 
