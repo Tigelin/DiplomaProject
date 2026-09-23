@@ -375,18 +375,35 @@ def teacher_groups(request):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    disciplines = Discipline.objects.filter(
-        teacher=teacher
-    ).select_related(
-        'plan',
-        'group__specialty',
-    ).annotate(
-        actual_hours=Sum('schedule__lesson__hours')
-    ).order_by(
-        '-group__year',
-        'group__name',
-        'plan__name',
-    )
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).select_related('status').order_by('-start_date')
+
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    disciplines = Discipline.objects.none()
+
+    if selected_semester:
+        disciplines = Discipline.objects.filter(
+            teacher=teacher,
+            semester=selected_semester
+        ).select_related(
+            'plan',
+            'group__specialty',
+        ).annotate(
+            actual_hours=Sum('schedule__lesson__hours')
+        ).order_by(
+            '-group__year',
+            'group__name',
+            'plan__name',
+        )
 
     search = request.GET.get('search', '')
     if search:
@@ -405,12 +422,20 @@ def teacher_groups(request):
         on_ends=1,
     )
 
+    if selected_semester:
+        for discipline in disciplines:
+            discipline.group.display_name = discipline.group.get_display_name(
+                selected_semester
+            )
+
     context = {
         'teacher': teacher,
         'disciplines': disciplines,
         'search': search,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/teacher/groups.html', context)
 
