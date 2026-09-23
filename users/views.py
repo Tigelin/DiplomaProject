@@ -384,14 +384,59 @@ def student_attendance(request):
         messages.error(request, 'Профиль студента не найден.')
         return redirect('home')
 
-    lessons = Lesson.objects.filter(
-        schedule__discipline__group=student.group
-    ).select_related(
-        'schedule__discipline__plan',
-        'schedule'
-    ).order_by('schedule__date', 'schedule__lesson_number')
+    semester_memberships = student.group_memberships.filter(
+        start_date__lte=OuterRef('end_date')
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=OuterRef('start_date'))
+    )
 
-    attendances = {att.lesson_id: att for att in Attendance.objects.filter(student=student)}
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).annotate(
+        has_membership=Exists(semester_memberships)
+    ).filter(
+        has_membership=True
+    ).select_related('status').order_by('-start_date')
+
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    lessons = Lesson.objects.none()
+
+    if selected_semester:
+        lesson_memberships = student.group_memberships.filter(
+            group_id=OuterRef('schedule__discipline__group_id'),
+            start_date__lte=OuterRef('schedule__date')
+        ).filter(
+            Q(end_date__isnull=True) |
+            Q(end_date__gte=OuterRef('schedule__date'))
+        )
+
+        lessons = Lesson.objects.filter(
+            schedule__discipline__semester=selected_semester
+        ).annotate(
+            has_membership=Exists(lesson_memberships)
+        ).filter(
+            has_membership=True
+        ).select_related(
+            'schedule__discipline__plan',
+            'schedule'
+        ).order_by('schedule__date', 'schedule__lesson_number')
+
+    attendances = {
+        attendance.lesson_id: attendance
+        for attendance in Attendance.objects.filter(
+            student=student,
+            lesson__in=lessons
+        ).select_related('attendance_type')
+    }
 
     disciplines_dict = {}
     for lesson in lessons:
@@ -427,7 +472,12 @@ def student_attendance(request):
             matrix[discipline_id][date][lesson_number] = 'Присутствовал'
 
     total = len(lessons)
-    present = sum(1 for att in attendances.values() if att.attendance_type.name == 'Присутствовал')
+    present_statuses = ['Присутствовал', 'Опоздал']
+    present = sum(
+        1 for attendance in attendances.values()
+        if attendance.attendance_type and
+        attendance.attendance_type.name in present_statuses
+    )
 
     present += (total - len(attendances))
     absent = total - present
@@ -442,6 +492,8 @@ def student_attendance(request):
         'present': present,
         'absent': absent,
         'attendance_percent': attendance_percent,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/student/attendance.html', context)
 
