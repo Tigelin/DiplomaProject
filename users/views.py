@@ -2055,11 +2055,8 @@ def admin_semester_disciplines(request, semester_id):
     ).select_related(
         'plan',
         'group__specialty',
+        'group__number_set',
         'teacher__user'
-    ).order_by(
-        'group__specialty__name',
-        'group__name',
-        'plan__name'
     )
 
     if not disciplines.exists():
@@ -2078,19 +2075,50 @@ def admin_semester_disciplines(request, semester_id):
     search = request.GET.get('search', '')
     show_unassigned = request.GET.get('show_unassigned') == '1'
 
-    if search:
-        disciplines = disciplines.filter(
-            Q(plan__name__icontains=search) |
-            Q(group__name__icontains=search) |
-            Q(group__specialty__name__icontains=search) |
-            Q(group__specialty__code__icontains=search) |
-            Q(teacher__user__last_name__icontains=search) |
-            Q(teacher__user__first_name__icontains=search) |
-            Q(teacher__user__patronymic__icontains=search)
-        )
-
     if show_unassigned:
         disciplines = disciplines.filter(teacher__isnull=True)
+
+    available_disciplines = disciplines
+    disciplines = []
+    group_names = {}
+    search_value = search.lower()
+
+    for discipline in available_disciplines:
+        if discipline.group_id not in group_names:
+            group_names[discipline.group_id] = (
+                discipline.group.get_display_name(semester)
+            )
+
+        discipline.group.display_name = group_names[
+            discipline.group_id
+        ]
+
+        if search:
+            teacher_name = ''
+
+            if discipline.teacher:
+                teacher_name = (
+                    discipline.teacher.user.get_full_name().lower()
+                )
+
+            if not (
+                search_value in discipline.plan.name.lower()
+                or search_value in discipline.group.display_name.lower()
+                or search_value in discipline.group.specialty.name.lower()
+                or search_value in discipline.group.specialty.code.lower()
+                or search_value in teacher_name
+            ):
+                continue
+
+        disciplines.append(discipline)
+
+    disciplines.sort(
+        key=lambda discipline: (
+            discipline.group.specialty.name,
+            discipline.group.display_name,
+            discipline.plan.name,
+        )
+    )
 
     paginator = Paginator(disciplines, 10)
     disciplines = paginator.get_page(request.GET.get('page'))
