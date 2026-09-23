@@ -131,22 +131,59 @@ def groups_list(request):
 
 
 def disciplines_list(request):
-    disciplines = Discipline.objects.select_related(
-        'plan',
-        'group',
-        'teacher__user',
-    ).order_by(
-        'plan__name',
-        'group__name',
-    )
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).select_related('status').order_by('-start_date')
 
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    disciplines = []
     search = request.GET.get('search', '')
-    if search:
-        disciplines = disciplines.filter(
-            Q(plan__name__icontains=search) |
-            Q(group__name__icontains=search) |
-            Q(teacher__user__last_name__icontains=search) |
-            Q(teacher__user__first_name__icontains=search)
+
+    if selected_semester:
+        available_disciplines = Discipline.objects.filter(
+            semester=selected_semester
+        ).select_related(
+            'plan',
+            'group__number_set',
+            'teacher__user',
+        )
+
+        group_names = {}
+        search_value = search.lower()
+
+        for discipline in available_disciplines:
+            if discipline.group_id not in group_names:
+                group_names[discipline.group_id] = (
+                    discipline.group.get_display_name(selected_semester)
+                )
+
+            discipline.group.display_name = group_names[
+                discipline.group_id
+            ]
+
+            if search:
+                if not (
+                    search_value in discipline.plan.name.lower()
+                    or search_value in discipline.group.display_name.lower()
+                    or search_value in discipline.teacher.user.get_full_name().lower()
+                ):
+                    continue
+
+            disciplines.append(discipline)
+
+        disciplines.sort(
+            key=lambda discipline: (
+                discipline.plan.name,
+                discipline.group.display_name,
+            )
         )
 
     paginator = Paginator(disciplines, 15)
@@ -163,6 +200,8 @@ def disciplines_list(request):
         'search': search,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'journal/disciplines.html', context)
 
