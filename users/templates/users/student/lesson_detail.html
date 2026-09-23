@@ -14,7 +14,11 @@
 
     {% else %}
 
-        <li class="breadcrumb-item"><a href="{% url 'student_grades' %}">Мои оценки</a></li>
+        <li class="breadcrumb-item">
+            <a href="{% url 'student_grades' %}{% if request.GET.semester_id %}?semester_id={{ request.GET.semester_id }}{% endif %}">
+                Мои оценки
+            </a>
+        </li>
 
     {% endif %}
 
@@ -149,7 +153,7 @@
 
         {% else %}
 
-            <a href="{% url 'student_grades' %}" class="btn btn-secondary mt-3">
+            <a href="{% url 'student_grades' %}{% if request.GET.semester_id %}?semester_id={{ request.GET.semester_id }}{% endif %}" class="btn btn-secondary mt-3">
                 <i class="bi bi-arrow-left"></i> Назад к оценкам
             </a>
 

@@ -18,6 +18,20 @@
         <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill"></i> Мои оценки</h4>
     </div>
     <div class="card-body">
+        {% if semesters %}
+
+            <form method="get" class="mb-4">
+                <label class="form-label">Выберите учебный семестр:</label>
+                <select name="semester_id" class="form-select" onchange="this.form.submit()">
+                    {% for semester in semesters %}
+                        <option value="{{ semester.id }}" {% if selected_semester.id == semester.id %}selected{% endif %}>
+                            {{ semester }} — {{ semester.status.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+
+        {% endif %}
 
         {% if dates %}
 
@@ -59,7 +73,7 @@
                                                         <span class="text-danger"
                                                               title="Оценка: 1"
                                                               style="cursor: pointer;"
-                                                              onclick="window.location.href='{% url 'lesson_detail' grade.task.lesson.id %}?from=grades'">●</span>
+                                                              onclick="window.location.href='{% url 'lesson_detail' grade.task.lesson.id %}?from=grades&semester_id={{ selected_semester.id }}'">●</span>
 
                                                     {% else %}
 
@@ -70,7 +84,7 @@
                                                             {% elif grade.value == 2 %}bg-danger
                                                             {% endif %} mb-1"
                                                             style="cursor: pointer;"
-                                                            onclick="window.location.href='{% url 'lesson_detail' grade.task.lesson.id %}?from=grades'">
+                                                            onclick="window.location.href='{% url 'lesson_detail' grade.task.lesson.id %}?from=grades&semester_id={{ selected_semester.id }}'">
                                                             {{ grade.value }}
                                                         </span>
 
@@ -119,9 +133,21 @@
 
         {% else %}
 
-            <div class="alert alert-info text-center">
-                <i class="bi bi-info-circle"></i> У вас пока нет оценок.
-            </div>
+            {% if selected_semester %}
+
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-info-circle"></i>
+                    За выбранный семестр оценок пока нет.
+                </div>
+
+            {% else %}
+
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-info-circle"></i>
+                    Нет доступных учебных семестров.
+                </div>
+
+            {% endif %}
 
         {% endif %}
 

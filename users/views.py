@@ -13,7 +13,7 @@ from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, Exists, OuterRef
 from journal.models import (
     Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
@@ -110,14 +110,42 @@ def student_grades(request):
         messages.error(request, 'Профиль студента не найден.')
         return redirect('home')
 
-    grades = Grade.objects.filter(
-        student=student,
-        task__isnull=False,
-        task__lesson__isnull=False
-    ).select_related(
-        'task__lesson__schedule__discipline__plan',
-        'task__lesson__schedule'
-    ).order_by('task__lesson__schedule__date')
+    memberships = student.group_memberships.filter(
+        start_date__lte=OuterRef('end_date')
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=OuterRef('start_date'))
+    )
+
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).annotate(
+        has_membership=Exists(memberships)
+    ).filter(
+        has_membership=True
+    ).select_related('status').order_by('-start_date')
+
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    grades = Grade.objects.none()
+
+    if selected_semester:
+        grades = Grade.objects.filter(
+            student=student,
+            task__isnull=False,
+            task__lesson__isnull=False,
+            task__lesson__schedule__discipline__semester=selected_semester
+        ).select_related(
+            'task__lesson__schedule__discipline__plan',
+            'task__lesson__schedule'
+        ).order_by('task__lesson__schedule__date')
 
     disciplines_dict = {}
     for grade in grades:
@@ -166,6 +194,8 @@ def student_grades(request):
         'dates': sorted_dates,
         'matrix': matrix,
         'averages': averages,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/student/grades.html', context)
 
@@ -242,9 +272,23 @@ def lesson_detail(request, lesson_id):
         messages.error(request, 'Профиль студента не найден.')
         return redirect('home')
 
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson.objects.select_related(
+            'schedule__discipline__group'
+        ),
+        id=lesson_id
+    )
 
-    if lesson.schedule.discipline.group != student.group:
+    lesson_date = lesson.schedule.date
+    has_access = student.group_memberships.filter(
+        group=lesson.schedule.discipline.group,
+        start_date__lte=lesson_date
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=lesson_date)
+    ).exists()
+
+    if not has_access:
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('student_grades')
 
