@@ -211,35 +211,98 @@ def student_tasks(request):
     show_all = request.GET.get('show_all', 'false') == 'true'
     discipline_id = request.GET.get('discipline_id', '')
 
-    grades_dict = {}
-    for grade in Grade.objects.filter(student=student, task__isnull=False):
-        grades_dict[grade.task_id] = grade.value
+    semester_memberships = student.group_memberships.filter(
+        start_date__lte=OuterRef('end_date')
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=OuterRef('start_date'))
+    )
 
-    completed_task_ids = [task_id for task_id, grade in grades_dict.items() if grade >= 2]
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).annotate(
+        has_membership=Exists(semester_memberships)
+    ).filter(
+        has_membership=True
+    ).select_related('status').order_by('-start_date')
 
-    all_tasks = Task.objects.filter(
-        lesson__schedule__discipline__group=student.group
-    ).select_related(
-        'lesson__schedule__discipline__plan',
-        'lesson__schedule__discipline__teacher__user'
-    ).distinct().order_by('lesson__schedule__date')
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    all_tasks = Task.objects.none()
+    disciplines = Discipline.objects.none()
+
+    if selected_semester:
+        lesson_memberships = student.group_memberships.filter(
+            group_id=OuterRef(
+                'lesson__schedule__discipline__group_id'
+            ),
+            start_date__lte=OuterRef('lesson__schedule__date')
+        ).filter(
+            Q(end_date__isnull=True) |
+            Q(end_date__gte=OuterRef('lesson__schedule__date'))
+        )
+
+        all_tasks = Task.objects.filter(
+            lesson__schedule__discipline__semester=selected_semester
+        ).filter(
+            Q(required_students=student) |
+            Q(grades__student=student)
+        ).annotate(
+            has_membership=Exists(lesson_memberships)
+        ).filter(
+            has_membership=True
+        ).select_related(
+            'lesson__schedule__discipline__plan',
+            'lesson__schedule__discipline__teacher__user'
+        ).distinct().order_by('lesson__schedule__date')
+
+        available_discipline_ids = all_tasks.order_by().values_list(
+            'lesson__schedule__discipline_id',
+            flat=True
+        )
+
+        disciplines = Discipline.objects.filter(
+            id__in=available_discipline_ids
+        ).select_related('plan').order_by('plan__name')
 
     if discipline_id:
-        all_tasks = all_tasks.filter(lesson__schedule__discipline__id=discipline_id)
+        selected_discipline = get_object_or_404(
+            disciplines,
+            id=discipline_id
+        )
+        all_tasks = all_tasks.filter(
+            lesson__schedule__discipline=selected_discipline
+        )
+
+    grades_dict = {}
+    for grade in Grade.objects.filter(
+            student=student,
+            task__in=all_tasks
+    ):
+        grades_dict[grade.task_id] = grade.value
 
     tasks_with_status = []
     for task in all_tasks:
-        if task.id in grades_dict:
-            grade = grades_dict[task.id]
-            is_completed = grade >= 2
-            tasks_with_status.append({
-                'task': task,
-                'is_completed': is_completed,
-                'grade': grade,
-            })
+        grade = grades_dict.get(task.id)
+        is_completed = grade is not None and grade >= 2
+        tasks_with_status.append({
+            'task': task,
+            'is_completed': is_completed,
+            'grade': grade,
+        })
 
     if not show_all:
-        tasks_with_status = [t for t in tasks_with_status if not t['is_completed']]
+        tasks_with_status = [
+            task for task in tasks_with_status
+            if not task['is_completed']
+        ]
 
     paginator = Paginator(tasks_with_status, 7)
     page_number = request.GET.get('page')
@@ -250,8 +313,6 @@ def student_tasks(request):
         on_ends=1,
     )
 
-    disciplines = Discipline.objects.filter(group=student.group).select_related('plan')
-
     context = {
         'student': student,
         'tasks_with_status': tasks_with_status,
@@ -260,6 +321,8 @@ def student_tasks(request):
         'selected_discipline_id': discipline_id,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/student/tasks.html', context)
 
