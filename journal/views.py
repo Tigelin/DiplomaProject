@@ -207,7 +207,10 @@ def disciplines_list(request):
 
 
 def discipline_plans_list(request):
-    plans = DisciplinePlan.objects.filter(is_archived=False).order_by('name')
+    plans = DisciplinePlan.objects.filter(
+        is_approved=True,
+        is_archived=False,
+    ).order_by('name')
 
     search = request.GET.get('search', '')
     if search:
