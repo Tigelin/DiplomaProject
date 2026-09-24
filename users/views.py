@@ -32,7 +32,7 @@ from django.core.exceptions import ValidationError
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('home')
+        return redirect('dashboard')
 
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -42,7 +42,7 @@ def login_view(request):
         if user is not None:
             login(request, user)
             messages.success(request, f'Добро пожаловать, {user.get_full_name() or user.username}!')
-            return redirect('home')
+            return redirect('dashboard')
         else:
             messages.error(request, 'Неверное имя пользователя или пароль.')
 
@@ -61,6 +61,8 @@ def dashboard(request):
         return redirect('student_dashboard')
     elif request.user.role and request.user.role.name == 'Преподаватель':
         return redirect('teacher_dashboard')
+    elif request.user.is_staff:
+        return redirect('admin_dashboard')
     return render(request, 'users/dashboard.html')
 
 

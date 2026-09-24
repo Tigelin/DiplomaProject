@@ -16,11 +16,6 @@
         <h4 class="mb-0"><i class="bi bi-person-circle"></i> Личный кабинет студента</h4>
     </div>
     <div class="card-body">
-
-        <div class="alert alert-success">
-            Добро пожаловать, {{ student.user.get_full_name|default:student.user.username }}!
-        </div>
-
         <div class="row">
             <div class="col-md-6 mb-3">
                 <div class="card text-center h-100">
@@ -63,7 +58,6 @@
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
