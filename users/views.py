@@ -19,7 +19,7 @@ from journal.models import (
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
     Teacher, Classroom, AcademicSemester, AcademicSemesterStatus,
     Specialty, SpecialtyCurriculum, SpecialtyCurriculumItem,
-    AcademicSemesterCurriculum
+    AcademicSemesterCurriculum, StudentGroupMembership
 )
 from .forms import LessonFileUploadForm
 from django.urls import reverse
@@ -2469,8 +2469,32 @@ def admin_semester_close(request, semester_id):
         code='CLOSED'
     )
 
-    semester.status = closed_status
-    semester.save(update_fields=['status'])
+    groups = Group.objects.filter(
+        discipline__semester=semester,
+        is_graduated=False
+    ).select_related('specialty').distinct()
+
+    graduated_group_ids = []
+
+    for group in groups:
+        if group.get_study_semester(semester) == group.specialty.duration_semesters:
+            graduated_group_ids.append(group.id)
+
+    with transaction.atomic():
+        if graduated_group_ids:
+            Group.objects.filter(
+                id__in=graduated_group_ids
+            ).update(is_graduated=True)
+
+            StudentGroupMembership.objects.filter(
+                Q(end_date__isnull=True) |
+                Q(end_date__gt=semester.end_date),
+                group_id__in=graduated_group_ids,
+                start_date__lte=semester.end_date
+            ).update(end_date=semester.end_date)
+
+        semester.status = closed_status
+        semester.save(update_fields=['status'])
 
     messages.success(
         request,
