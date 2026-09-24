@@ -1,0 +1,77 @@
+{% extends "journal/base.html" %}
+
+{% block title %}
+
+    {% if curriculum %}Редактирование{% else %}Добавление{% endif %} учебного плана
+
+{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_curriculums' %}">Учебные планы специальностей</a></li>
+    <li class="breadcrumb-item active">
+        {% if curriculum %}Редактирование{% else %}Добавление{% endif %}
+    </li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-list-check"></i>
+            {% if curriculum %}Редактирование{% else %}Добавление{% endif %} учебного плана
+        </h4>
+    </div>
+
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label class="form-label">Название</label>
+                <input type="text" name="name" class="form-control" value="{{ name }}" maxlength="200" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Специальность</label>
+                <select name="specialty_id" class="form-select" required>
+                    <option value="">-- Выберите --</option>
+                    {% for specialty in specialties %}
+                        <option value="{{ specialty.id }}" {% if selected_specialty.id == specialty.id %}selected{% endif %}>
+                            {{ specialty.code }} — {{ specialty.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Семестр обучения</label>
+                <input type="number" name="study_semester" class="form-control" value="{{ study_semester }}" min="1" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Сохранить
+            </button>
+
+            {% if curriculum %}
+                <a href="{% url 'admin_curriculums' %}?specialty_id={{ return_specialty_id }}&study_semester={{ return_study_semester }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Отмена
+                </a>
+            {% elif selected_specialty and study_semester %}
+                <a href="{% url 'admin_curriculums' %}?specialty_id={{ selected_specialty.id }}&study_semester={{ study_semester }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Отмена
+                </a>
+            {% else %}
+                <a href="{% url 'admin_curriculums' %}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Отмена
+                </a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% endblock %}

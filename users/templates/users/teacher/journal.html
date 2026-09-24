@@ -8,7 +8,7 @@
     <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
     <li class="breadcrumb-item"><a href="{% url 'teacher_dashboard' %}">Личный кабинет</a></li>
     <li class="breadcrumb-item"><a href="{% url 'teacher_groups' %}">Мои группы</a></li>
-    <li class="breadcrumb-item active">{{ discipline.plan.name }} ({{ discipline.group.name }})</li>
+    <li class="breadcrumb-item active">{{ discipline.plan.name }} ({{ discipline.group.display_name }})</li>
 
 {% endblock %}
 
@@ -17,9 +17,15 @@
 <div class="card">
     <div class="card-header bg-primary text-white">
         <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill"></i> Журнал оценок - {{ discipline.plan.name }}</h4>
-        <small>Группа: {{ discipline.group.name }}</small>
+        <small>Группа: {{ discipline.group.display_name }}</small>
     </div>
     <div class="card-body">
+        {% if is_read_only %}
+            <div class="alert alert-secondary">
+                <i class="bi bi-lock"></i>
+                Семестр закрыт. Журнал доступен только для просмотра.
+            </div>
+        {% endif %}
 
         <div class="row mb-3">
             <div class="col-md-12 text-end">
@@ -41,7 +47,10 @@
                             <th style="min-width: 150px; vertical-align: middle;">Студент</th>
 
                             {% for schedule in schedules %}
-                                <th colspan="{% if schedule.has_lesson and schedule.tasks %}{{ schedule.tasks|length|add:1 }}{% elif schedule.has_lesson %}2{% else %}1{% endif %}" style="vertical-align: top; cursor: pointer;" onclick="window.location.href='{% url 'teacher_lesson' schedule.id %}'" class="lesson-start {% if not schedule.has_lesson %}opacity-50{% endif %}">
+                                <th colspan="{% if schedule.has_lesson and schedule.tasks %}{{ schedule.tasks|length|add:1 }}{% elif schedule.has_lesson and not is_read_only %}2{% else %}1{% endif %}"
+                                    style="vertical-align: top;{% if schedule.has_lesson or not is_read_only %} cursor: pointer;{% endif %}"
+                                    {% if schedule.has_lesson or not is_read_only %}onclick="window.location.href='{% url 'teacher_lesson' schedule.id %}'"{% endif %}
+                                    class="lesson-start {% if not schedule.has_lesson %}opacity-50{% endif %}">
                                     {{ schedule.date|date:"d.m.Y" }}<br>
                                     <small>{{ schedule.lesson_number }} пара</small>
                                     {% if schedule.lesson_type %}
@@ -67,14 +76,25 @@
 
                                 {% if schedule.has_lesson and schedule.tasks %}
                                     {% for task in schedule.tasks %}
-                                        <th style="min-width: 80px; vertical-align: top; font-weight: normal; cursor: pointer;" onclick="window.location.href='{% url 'teacher_task_grades' task.id %}'">
-                                            <span class="text-white">{{ task.name }}</span>
+                                        <th style="min-width: 80px; vertical-align: middle; font-weight: normal; cursor: pointer;"
+                                            title="{{ task.task_type.name }} — {{ task.name }}"
+                                            onclick="window.location.href='{% url 'teacher_task_grades' task.id %}'">
+                                            <span class="text-white">{{ task.task_type.abbreviation }}</span>
                                         </th>
                                     {% endfor %}
                                 {% elif schedule.has_lesson %}
-                                    <th style="min-width: 80px; vertical-align: top; font-weight: normal; cursor: pointer;" onclick="window.location.href='{% url 'teacher_task_create' schedule.lesson.id %}'">
-                                        <span class="text-white-50">+ добавить задание</span>
-                                    </th>
+                                    {% if not is_read_only %}
+                                        <th style="min-width: 80px; vertical-align: top; font-weight: normal;">
+                                            <form method="post" action="{% url 'teacher_task_create' schedule.lesson.id %}">
+                                                {% csrf_token %}
+
+                                                <button type="submit"
+                                                        class="btn btn-link p-0 text-white-50 text-decoration-none">
+                                                    + задание
+                                                </button>
+                                            </form>
+                                        </th>
+                                    {% endif %}
                                 {% else %}
                                     <th class="lesson-start" style="min-width: 80px; vertical-align: top; font-weight: normal; opacity: 0.3;">
                                         <span class="text-white-50">нет занятия</span>
@@ -152,9 +172,11 @@
                                         {% endfor %}
 
                                     {% elif schedule.has_lesson %}
-                                        <td class="align-middle">
-                                            <span class="text-muted">—</span>
-                                        </td>
+                                        {% if not is_read_only %}
+                                            <td class="align-middle">
+                                                <span class="text-muted">—</span>
+                                            </td>
+                                        {% endif %}
                                     {% else %}
                                         <td class="align-middle opacity-50 lesson-start">
                                             <span class="text-muted">—</span>

@@ -18,129 +18,153 @@
         <h4 class="mb-0"><i class="bi bi-person-check"></i> Моя посещаемость</h4>
     </div>
     <div class="card-body">
+        {% if semesters %}
 
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card text-center bg-success text-white">
-                    <div class="card-body">
-                        <h3>{{ present }}</h3>
-                        <p class="mb-0">Присутствовал</p>
+            <form method="get" class="mb-4">
+                <label class="form-label">Выберите учебный семестр:</label>
+                <select name="semester_id" class="form-select" onchange="this.form.submit()">
+                    {% for semester in semesters %}
+                        <option value="{{ semester.id }}" {% if selected_semester.id == semester.id %}selected{% endif %}>
+                            {{ semester }} — {{ semester.status.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+
+        {% endif %}
+
+        {% if selected_semester %}
+
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center bg-success text-white">
+                        <div class="card-body">
+                            <h3>{{ present }}</h3>
+                            <p class="mb-0">Присутствовал</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center bg-danger text-white">
+                        <div class="card-body">
+                            <h3>{{ absent }}</h3>
+                            <p class="mb-0">Отсутствовал</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center bg-warning text-dark">
+                        <div class="card-body">
+                            <h3>{{ total }}</h3>
+                            <p class="mb-0">Всего занятий</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center bg-info text-white">
+                        <div class="card-body">
+                            <h3>{{ attendance_percent }}%</h3>
+                            <p class="mb-0">Общая посещаемость</p>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
-                <div class="card text-center bg-danger text-white">
-                    <div class="card-body">
-                        <h3>{{ absent }}</h3>
-                        <p class="mb-0">Отсутствовал</p>
-                    </div>
-                </div>
+
+            <div class="mb-3">
+                <small class="text-muted">
+                    Обозначения:
+                    <span class="text-success">✓</span> - Присутствовал,
+                    <span class="text-warning">О</span> - Опоздал,
+                    <span class="text-primary">Б</span> - Отсутствовал по болезни,
+                    <span class="text-orange">УП</span> - Отсутствовал по уважительной причине,
+                    <span class="text-danger">НП</span> - Отсутствовал без причины
+                </small>
             </div>
-            <div class="col-md-3">
-                <div class="card text-center bg-warning text-dark">
-                    <div class="card-body">
-                        <h3>{{ total }}</h3>
-                        <p class="mb-0">Всего занятий</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card text-center bg-info text-white">
-                    <div class="card-body">
-                        <h3>{{ attendance_percent }}%</h3>
-                        <p class="mb-0">Общая посещаемость</p>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <div class="mb-3">
-            <small class="text-muted">
-                Обозначения:
-                <span class="text-success">✓</span> - Присутствовал,
-                <span class="text-warning">О</span> - Опоздал,
-                <span class="text-primary">Б</span> - Отсутствовал по болезни,
-                <span class="text-orange">УП</span> - Отсутствовал по уважительной причине,
-                <span class="text-danger">НП</span> - Отсутствовал без причины
-            </small>
-        </div>
+            {% if lessons %}
 
-        {% if lessons %}
-
-            <div class="table-responsive">
-                <table class="table table-bordered text-center align-middle journal-table">
-                    <thead class="table-dark">
-                        <tr>
-                            <th style="min-width: 150px">Дисциплина</th>
-
-                            {% for lesson in lessons %}
-
-                                <th style="min-width: 80px">
-                                    {{ lesson.date|date:"d.m.Y" }}<br>
-                                    <small>{{ lesson.lesson_number }} пара</small>
-                                </th>
-
-                            {% endfor %}
-
-                        </tr>
-                    </thead>
-                    <tbody>
-
-                        {% for discipline_id, discipline_name in disciplines %}
-
+                <div class="table-responsive">
+                    <table class="table table-bordered text-center align-middle journal-table">
+                        <thead class="table-dark">
                             <tr>
-                                <th class="bg-light text-start">{{ discipline_name }}</th>
+                                <th style="min-width: 150px">Дисциплина</th>
 
                                 {% for lesson in lessons %}
 
-                                    <td>
-
-                                        {% with matrix|get_by_key:discipline_id|get_by_key:lesson.date|get_by_key:lesson.lesson_number as status %}
-
-                                            {% if status == 'Присутствовал' %}
-
-                                                <span class="text-success fw-bold">✓</span>
-
-                                            {% elif status == 'Опоздал' %}
-
-                                                <span class="text-warning fw-bold">О</span>
-
-                                            {% elif status == 'Отсутствовал по болезни' %}
-
-                                                <span class="text-primary fw-bold">Б</span>
-
-                                            {% elif status == 'Отсутствовал по уважительной причине' %}
-
-                                                <span class="text-orange fw-bold">УП</span>
-
-                                            {% elif status == 'Отсутствовал без причины' %}
-
-                                                <span class="text-danger fw-bold">НП</span>
-
-                                            {% else %}
-
-                                                <span class="text-muted">—</span>
-
-                                            {% endif %}
-
-                                        {% endwith %}
-
-                                    </td>
+                                    <th style="min-width: 80px">
+                                        {{ lesson.date|date:"d.m.Y" }}<br>
+                                        <small>{{ lesson.lesson_number }} пара</small>
+                                    </th>
 
                                 {% endfor %}
 
                             </tr>
+                        </thead>
+                        <tbody>
 
-                        {% endfor %}
+                            {% for discipline_id, discipline_name in disciplines %}
 
-                    </tbody>
-                </table>
-            </div>
+                                <tr>
+                                    <th class="bg-light text-start">{{ discipline_name }}</th>
+
+                                    {% for lesson in lessons %}
+
+                                        <td>
+
+                                            {% with matrix|get_by_key:discipline_id|get_by_key:lesson.date|get_by_key:lesson.lesson_number as status %}
+
+                                                {% if status == 'Присутствовал' %}
+
+                                                    <span class="text-success fw-bold">✓</span>
+
+                                                {% elif status == 'Опоздал' %}
+
+                                                    <span class="text-warning fw-bold">О</span>
+
+                                                {% elif status == 'Отсутствовал по болезни' %}
+
+                                                    <span class="text-primary fw-bold">Б</span>
+
+                                                {% elif status == 'Отсутствовал по уважительной причине' %}
+
+                                                    <span class="text-orange fw-bold">УП</span>
+
+                                                {% elif status == 'Отсутствовал без причины' %}
+
+                                                    <span class="text-danger fw-bold">НП</span>
+
+                                                {% else %}
+
+                                                    <span class="text-muted">—</span>
+
+                                                {% endif %}
+
+                                            {% endwith %}
+
+                                        </td>
+
+                                    {% endfor %}
+
+                                </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+                    </table>
+                </div>
+
+            {% else %}
+
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-info-circle"></i> За выбранный семестр занятий пока нет.
+                </div>
+
+            {% endif %}
 
         {% else %}
 
             <div class="alert alert-info text-center">
-                <i class="bi bi-info-circle"></i> Нет записей о посещаемости.
+                <i class="bi bi-info-circle"></i> Нет доступных учебных семестров.
             </div>
 
         {% endif %}

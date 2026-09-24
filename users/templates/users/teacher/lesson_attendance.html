@@ -30,10 +30,17 @@
 
         <div class="alert alert-info">
             <strong>Дисциплина:</strong> {{ schedule.discipline.plan.name }}<br>
-            <strong>Группа:</strong> {{ schedule.discipline.group.name }}<br>
+            <strong>Группа:</strong> {{ schedule.discipline.group.display_name }}<br>
             <strong>Дата занятия:</strong> {{ schedule.date|date:"d.m.Y" }}<br>
             <strong>Тема занятия:</strong> {{ lesson.topic|default:"—" }}
         </div>
+
+        {% if is_read_only %}
+            <div class="alert alert-secondary">
+                <i class="bi bi-lock"></i>
+                Семестр закрыт. Посещаемость доступна только для просмотра.
+            </div>
+        {% endif %}
 
         {% if students %}
 
@@ -76,7 +83,8 @@
                                                            autocomplete="off"
                                                            aria-label="{{ attendance_type.name }} — {{ student.user.last_name }} {{ student.user.first_name }}"
                                                            {% if current_type == attendance_type.id %}checked{% endif %}
-                                                           required>
+                                                           required
+                                                           {% if is_read_only %}disabled{% endif %}>
 
                                                     <label for="attendance_{{ student.id }}_{{ attendance_type.id }}"
                                                            class="attendance-option
@@ -121,9 +129,11 @@
                     <span class="text-danger fw-bold">НП</span> — отсутствовал без причины.
                 </div>
 
-                <button type="submit" class="btn btn-success mt-3">
-                    <i class="bi bi-check-circle"></i> Сохранить посещаемость
-                </button>
+                {% if not is_read_only %}
+                    <button type="submit" class="btn btn-success mt-3">
+                        <i class="bi bi-check-circle"></i> Сохранить посещаемость
+                    </button>
+                {% endif %}
 
                 <a href="{% url 'teacher_lesson' schedule.id %}" class="btn btn-secondary mt-3">
                     <i class="bi bi-arrow-left"></i> Назад к занятию

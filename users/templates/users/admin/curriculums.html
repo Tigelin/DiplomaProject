@@ -1,0 +1,174 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Учебные планы специальностей{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item active">Учебные планы специальностей</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h4 class="mb-0">
+            <i class="bi bi-list-check"></i> Учебные планы специальностей
+        </h4>
+
+        {% if selected_specialty and study_semester %}
+            <div class="d-flex gap-2">
+                {% if show_archived %}
+                    <a href="?specialty_id={{ selected_specialty.id }}&study_semester={{ study_semester }}" class="btn btn-light btn-sm">
+                        Только активные
+                    </a>
+                {% else %}
+                    <a href="?specialty_id={{ selected_specialty.id }}&study_semester={{ study_semester }}&show_archived=1" class="btn btn-light btn-sm">
+                        Показать все
+                    </a>
+                {% endif %}
+
+                <a href="{% url 'admin_curriculum_create' %}?specialty_id={{ selected_specialty.id }}&study_semester={{ study_semester }}" class="btn btn-light btn-sm">
+                    <i class="bi bi-plus"></i> Добавить
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card-body">
+        <form method="get" class="mb-4">
+
+            {% if show_archived %}
+                <input type="hidden" name="show_archived" value="1">
+            {% endif %}
+
+            <div class="row g-2">
+                <div class="{% if selected_specialty %}col-md-6{% else %}col-md-10{% endif %}">
+                    <label class="form-label">Специальность</label>
+                    <select name="specialty_id" class="form-select" required>
+                        <option value="">-- Выберите --</option>
+                        {% for specialty in specialties %}
+                            <option value="{{ specialty.id }}" {% if selected_specialty.id == specialty.id %}selected{% endif %}>
+                                {{ specialty.code }} — {{ specialty.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {% if selected_specialty %}
+                <div class="col-md-4">
+                    <label class="form-label">Семестр обучения</label>
+                    <select name="study_semester" class="form-select">
+                        <option value="">-- Выберите --</option>
+                        {% for semester_number in semester_numbers %}
+                            <option value="{{ semester_number }}" {% if study_semester == semester_number %}selected{% endif %}>
+                                {{ semester_number }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        {% if selected_specialty %}Показать{% else %}Выбрать{% endif %}
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        {% if selected_specialty and study_semester %}
+            <h5 class="mb-3">
+                {{ selected_specialty.code }} — {{ selected_specialty.name }},
+                {{ study_semester }} семестр
+            </h5>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Состояние</th>
+                            <th>Дисциплины</th>
+                            <th class="text-end">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for curriculum in curriculums %}
+                        <tr>
+                            <td>{{ curriculum.name }}</td>
+                            <td>
+                                {% if curriculum.is_archived %}
+                                    <span class="badge bg-dark">Архив</span>
+                                {% elif curriculum.is_approved %}
+                                    <span class="badge bg-success">Утверждён</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Черновик</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ curriculum.item_count }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'admin_curriculum_detail' curriculum.id %}" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-list-check"></i> Состав
+                                </a>
+
+                                {% if not curriculum.is_approved and not curriculum.is_archived %}
+                                    <a href="{% url 'admin_curriculum_edit' curriculum.id %}" class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-pencil"></i> Изменить
+                                    </a>
+
+                                    <form method="post" action="{% url 'admin_curriculum_delete' curriculum.id %}" class="d-inline">
+                                        {% csrf_token %}
+
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Удалить черновик учебного плана вместе с его составом?')">
+                                            <i class="bi bi-trash"></i> Удалить
+                                        </button>
+                                    </form>
+                                {% elif curriculum.is_approved and not curriculum.is_archived %}
+                                    <form method="post" action="{% url 'admin_curriculum_archive' curriculum.id %}" class="d-inline">
+                                        {% csrf_token %}
+
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm" onclick="return confirm('Отправить учебный план в архив?')">
+                                            <i class="bi bi-archive"></i> В архив
+                                        </button>
+                                    </form>
+                                {% elif curriculum.is_approved and curriculum.is_archived %}
+                                    <form method="post" action="{% url 'admin_curriculum_restore' curriculum.id %}" class="d-inline">
+                                        {% csrf_token %}
+
+                                        <button type="submit" class="btn btn-outline-success btn-sm">
+                                            <i class="bi bi-arrow-counterclockwise"></i> Восстановить
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center">
+                                Учебные планы не найдены
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% elif selected_specialty %}
+            <div class="alert alert-secondary mb-0">
+                Теперь выберите семестр обучения.
+            </div>
+        {% else %}
+            <div class="alert alert-secondary mb-0">
+                Выберите специальность.
+            </div>
+        {% endif %}
+
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary mt-3">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+{% endblock %}

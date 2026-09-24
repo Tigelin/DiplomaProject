@@ -13,16 +13,19 @@ from docx.shared import Inches, Pt, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count, Exists, OuterRef
 from journal.models import (
-    Grade, Task, Discipline, Lesson, LessonFile, Attendance,
+    Grade, Task, TaskType, Discipline, Lesson, LessonFile, Attendance,
     Group, Student, Schedule, LessonType, AttendanceType, DisciplinePlan,
-    Teacher, Classroom
+    Teacher, Classroom, AcademicSemester, AcademicSemesterStatus,
+    Specialty, SpecialtyCurriculum, SpecialtyCurriculumItem,
+    AcademicSemesterCurriculum, StudentGroupMembership
 )
 from .forms import LessonFileUploadForm
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.db import transaction
+from django.core.exceptions import ValidationError
 
 # Create your views here.
 
@@ -94,8 +97,41 @@ def student_profile(request):
         messages.success(request, 'Профиль успешно обновлён!')
         return redirect('student_profile')
 
+    memberships = student.group_memberships.filter(
+        start_date__lte=OuterRef('end_date')
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=OuterRef('start_date'))
+    )
+
+    selected_semester = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).annotate(
+        has_membership=Exists(memberships)
+    ).filter(
+        has_membership=True
+    ).order_by('-start_date').first()
+
+    group_name = ''
+
+    if selected_semester:
+        membership = student.group_memberships.filter(
+            start_date__lte=selected_semester.end_date
+        ).filter(
+            Q(end_date__isnull=True) |
+            Q(end_date__gte=selected_semester.start_date)
+        ).select_related(
+            'group__number_set'
+        ).order_by('-start_date').first()
+
+        if membership:
+            group_name = membership.group.get_display_name(
+                selected_semester
+            )
+
     return render(request, 'users/student/profile.html', {
         'student': student,
+        'group_name': group_name,
     })
 
 
@@ -107,14 +143,42 @@ def student_grades(request):
         messages.error(request, 'Профиль студента не найден.')
         return redirect('home')
 
-    grades = Grade.objects.filter(
-        student=student,
-        task__isnull=False,
-        task__lesson__isnull=False
-    ).select_related(
-        'task__lesson__schedule__discipline__plan',
-        'task__lesson__schedule'
-    ).order_by('task__lesson__schedule__date')
+    memberships = student.group_memberships.filter(
+        start_date__lte=OuterRef('end_date')
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=OuterRef('start_date'))
+    )
+
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).annotate(
+        has_membership=Exists(memberships)
+    ).filter(
+        has_membership=True
+    ).select_related('status').order_by('-start_date')
+
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    grades = Grade.objects.none()
+
+    if selected_semester:
+        grades = Grade.objects.filter(
+            student=student,
+            task__isnull=False,
+            task__lesson__isnull=False,
+            task__lesson__schedule__discipline__semester=selected_semester
+        ).select_related(
+            'task__lesson__schedule__discipline__plan',
+            'task__lesson__schedule'
+        ).order_by('task__lesson__schedule__date')
 
     disciplines_dict = {}
     for grade in grades:
@@ -163,6 +227,8 @@ def student_grades(request):
         'dates': sorted_dates,
         'matrix': matrix,
         'averages': averages,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/student/grades.html', context)
 
@@ -178,35 +244,98 @@ def student_tasks(request):
     show_all = request.GET.get('show_all', 'false') == 'true'
     discipline_id = request.GET.get('discipline_id', '')
 
-    grades_dict = {}
-    for grade in Grade.objects.filter(student=student, task__isnull=False):
-        grades_dict[grade.task_id] = grade.value
+    semester_memberships = student.group_memberships.filter(
+        start_date__lte=OuterRef('end_date')
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=OuterRef('start_date'))
+    )
 
-    completed_task_ids = [task_id for task_id, grade in grades_dict.items() if grade >= 2]
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).annotate(
+        has_membership=Exists(semester_memberships)
+    ).filter(
+        has_membership=True
+    ).select_related('status').order_by('-start_date')
 
-    all_tasks = Task.objects.filter(
-        lesson__schedule__discipline__group=student.group
-    ).select_related(
-        'lesson__schedule__discipline__plan',
-        'lesson__schedule__discipline__teacher__user'
-    ).distinct().order_by('lesson__schedule__date')
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    all_tasks = Task.objects.none()
+    disciplines = Discipline.objects.none()
+
+    if selected_semester:
+        lesson_memberships = student.group_memberships.filter(
+            group_id=OuterRef(
+                'lesson__schedule__discipline__group_id'
+            ),
+            start_date__lte=OuterRef('lesson__schedule__date')
+        ).filter(
+            Q(end_date__isnull=True) |
+            Q(end_date__gte=OuterRef('lesson__schedule__date'))
+        )
+
+        all_tasks = Task.objects.filter(
+            lesson__schedule__discipline__semester=selected_semester
+        ).filter(
+            Q(required_students=student) |
+            Q(grades__student=student)
+        ).annotate(
+            has_membership=Exists(lesson_memberships)
+        ).filter(
+            has_membership=True
+        ).select_related(
+            'lesson__schedule__discipline__plan',
+            'lesson__schedule__discipline__teacher__user'
+        ).distinct().order_by('lesson__schedule__date')
+
+        available_discipline_ids = all_tasks.order_by().values_list(
+            'lesson__schedule__discipline_id',
+            flat=True
+        )
+
+        disciplines = Discipline.objects.filter(
+            id__in=available_discipline_ids
+        ).select_related('plan').order_by('plan__name')
 
     if discipline_id:
-        all_tasks = all_tasks.filter(lesson__schedule__discipline__id=discipline_id)
+        selected_discipline = get_object_or_404(
+            disciplines,
+            id=discipline_id
+        )
+        all_tasks = all_tasks.filter(
+            lesson__schedule__discipline=selected_discipline
+        )
+
+    grades_dict = {}
+    for grade in Grade.objects.filter(
+            student=student,
+            task__in=all_tasks
+    ):
+        grades_dict[grade.task_id] = grade.value
 
     tasks_with_status = []
     for task in all_tasks:
-        if task.id in grades_dict:
-            grade = grades_dict[task.id]
-            is_completed = grade >= 2
-            tasks_with_status.append({
-                'task': task,
-                'is_completed': is_completed,
-                'grade': grade,
-            })
+        grade = grades_dict.get(task.id)
+        is_completed = grade is not None and grade >= 2
+        tasks_with_status.append({
+            'task': task,
+            'is_completed': is_completed,
+            'grade': grade,
+        })
 
     if not show_all:
-        tasks_with_status = [t for t in tasks_with_status if not t['is_completed']]
+        tasks_with_status = [
+            task for task in tasks_with_status
+            if not task['is_completed']
+        ]
 
     paginator = Paginator(tasks_with_status, 7)
     page_number = request.GET.get('page')
@@ -217,8 +346,6 @@ def student_tasks(request):
         on_ends=1,
     )
 
-    disciplines = Discipline.objects.filter(group=student.group).select_related('plan')
-
     context = {
         'student': student,
         'tasks_with_status': tasks_with_status,
@@ -227,6 +354,8 @@ def student_tasks(request):
         'selected_discipline_id': discipline_id,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/student/tasks.html', context)
 
@@ -239,9 +368,23 @@ def lesson_detail(request, lesson_id):
         messages.error(request, 'Профиль студента не найден.')
         return redirect('home')
 
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson.objects.select_related(
+            'schedule__discipline__group'
+        ),
+        id=lesson_id
+    )
 
-    if lesson.schedule.discipline.group != student.group:
+    lesson_date = lesson.schedule.date
+    has_access = student.group_memberships.filter(
+        group=lesson.schedule.discipline.group,
+        start_date__lte=lesson_date
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=lesson_date)
+    ).exists()
+
+    if not has_access:
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('student_grades')
 
@@ -274,14 +417,59 @@ def student_attendance(request):
         messages.error(request, 'Профиль студента не найден.')
         return redirect('home')
 
-    lessons = Lesson.objects.filter(
-        schedule__discipline__group=student.group
-    ).select_related(
-        'schedule__discipline__plan',
-        'schedule'
-    ).order_by('schedule__date', 'schedule__lesson_number')
+    semester_memberships = student.group_memberships.filter(
+        start_date__lte=OuterRef('end_date')
+    ).filter(
+        Q(end_date__isnull=True) |
+        Q(end_date__gte=OuterRef('start_date'))
+    )
 
-    attendances = {att.lesson_id: att for att in Attendance.objects.filter(student=student)}
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).annotate(
+        has_membership=Exists(semester_memberships)
+    ).filter(
+        has_membership=True
+    ).select_related('status').order_by('-start_date')
+
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    lessons = Lesson.objects.none()
+
+    if selected_semester:
+        lesson_memberships = student.group_memberships.filter(
+            group_id=OuterRef('schedule__discipline__group_id'),
+            start_date__lte=OuterRef('schedule__date')
+        ).filter(
+            Q(end_date__isnull=True) |
+            Q(end_date__gte=OuterRef('schedule__date'))
+        )
+
+        lessons = Lesson.objects.filter(
+            schedule__discipline__semester=selected_semester
+        ).annotate(
+            has_membership=Exists(lesson_memberships)
+        ).filter(
+            has_membership=True
+        ).select_related(
+            'schedule__discipline__plan',
+            'schedule'
+        ).order_by('schedule__date', 'schedule__lesson_number')
+
+    attendances = {
+        attendance.lesson_id: attendance
+        for attendance in Attendance.objects.filter(
+            student=student,
+            lesson__in=lessons
+        ).select_related('attendance_type')
+    }
 
     disciplines_dict = {}
     for lesson in lessons:
@@ -317,7 +505,12 @@ def student_attendance(request):
             matrix[discipline_id][date][lesson_number] = 'Присутствовал'
 
     total = len(lessons)
-    present = sum(1 for att in attendances.values() if att.attendance_type.name == 'Присутствовал')
+    present_statuses = ['Присутствовал', 'Опоздал']
+    present = sum(
+        1 for attendance in attendances.values()
+        if attendance.attendance_type and
+        attendance.attendance_type.name in present_statuses
+    )
 
     present += (total - len(attendances))
     absent = total - present
@@ -332,6 +525,8 @@ def student_attendance(request):
         'present': present,
         'absent': absent,
         'attendance_percent': attendance_percent,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/student/attendance.html', context)
 
@@ -372,25 +567,63 @@ def teacher_groups(request):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    disciplines = Discipline.objects.filter(
-        teacher=teacher
-    ).select_related(
-        'plan',
-        'group__specialty',
-    ).annotate(
-        actual_hours=Sum('schedule__lesson__hours')
-    ).order_by(
-        '-group__year',
-        'group__name',
-        'plan__name',
-    )
+    semesters = AcademicSemester.objects.exclude(
+        status__code='DRAFT'
+    ).select_related('status').order_by('-start_date')
 
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.first()
+
+    disciplines = []
     search = request.GET.get('search', '')
-    if search:
-        disciplines = disciplines.filter(
-            Q(plan__name__icontains=search) |
-            Q(group__name__icontains=search) |
-            Q(group__specialty__name__icontains=search)
+
+    if selected_semester:
+        available_disciplines = Discipline.objects.filter(
+            teacher=teacher,
+            semester=selected_semester
+        ).select_related(
+            'plan',
+            'group__specialty',
+            'group__number_set',
+        ).annotate(
+            actual_hours=Sum('schedule__lesson__hours')
+        )
+
+        group_names = {}
+        search_value = search.lower()
+
+        for discipline in available_disciplines:
+            if discipline.group_id not in group_names:
+                group_names[discipline.group_id] = (
+                    discipline.get_group_display_name()
+                )
+
+            discipline.group.display_name = group_names[
+                discipline.group_id
+            ]
+
+            if search:
+                if not (
+                    search_value in discipline.plan.name.lower()
+                    or search_value in discipline.group.display_name.lower()
+                    or search_value in discipline.group.specialty.name.lower()
+                ):
+                    continue
+
+            disciplines.append(discipline)
+
+        disciplines.sort(
+            key=lambda discipline: (
+                -discipline.group.year,
+                discipline.group.display_name,
+                discipline.plan.name,
+            )
         )
 
     paginator = Paginator(disciplines, 15)
@@ -408,6 +641,8 @@ def teacher_groups(request):
         'search': search,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/teacher/groups.html', context)
 
@@ -420,12 +655,21 @@ def teacher_journal(request, discipline_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline.objects.select_related(
+            'teacher',
+            'semester__status',
+            'group__number_set',
+        ),
+        id=discipline_id
+    )
 
     if discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этой дисциплине.')
         return redirect('teacher_groups')
 
+    discipline.group.display_name = discipline.get_group_display_name()
+    is_read_only = discipline.semester.status.code == 'CLOSED'
     students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
 
     schedules = Schedule.objects.filter(
@@ -438,7 +682,11 @@ def teacher_journal(request, discipline_id):
         if schedule.has_lesson:
             schedule.lesson = lesson
             schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
-            schedule.tasks = Task.objects.filter(lesson=lesson)
+            schedule.tasks = (
+                Task.objects
+                .filter(lesson=lesson)
+                .select_related('task_type')
+            )
         else:
             schedule.lesson_type = None
             schedule.tasks = []
@@ -490,6 +738,7 @@ def teacher_journal(request, discipline_id):
         'schedules': schedules,
         'grades_matrix': grades_matrix,
         'attendance_matrix': attendance_matrix,
+        'is_read_only': is_read_only,
     }
     return render(request, 'users/teacher/journal.html', context)
 
@@ -502,11 +751,31 @@ def teacher_lesson(request, schedule_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    schedule = get_object_or_404(Schedule, id=schedule_id)
+    schedule = get_object_or_404(
+        Schedule.objects.select_related(
+            'discipline__teacher',
+            'discipline__semester__status',
+            'discipline__group__number_set',
+        ),
+        id=schedule_id
+    )
 
     if schedule.discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
+
+    schedule.discipline.group.display_name = schedule.discipline.get_group_display_name()
+    is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
+
+    if request.method == 'POST' and is_read_only:
+        messages.error(
+            request,
+            'Закрытый семестр доступен только для просмотра.'
+        )
+        return redirect(
+            'teacher_lesson',
+            schedule_id=schedule.id
+        )
 
     lesson = Lesson.objects.filter(schedule=schedule).first()
     upload_form = LessonFileUploadForm()
@@ -528,8 +797,21 @@ def teacher_lesson(request, schedule_id):
 
         elif 'add_task' in request.POST:
             if lesson:
+                task_type_id = request.POST.get('task_type', '')
+
+                if not task_type_id.isdigit():
+                    messages.error(request, 'Выберите тип задания.')
+                    return redirect('teacher_lesson', schedule_id=schedule.id)
+
+                task_type = TaskType.objects.filter(id=task_type_id).first()
+
+                if not task_type:
+                    messages.error(request, 'Выбранный тип задания не найден.')
+                    return redirect('teacher_lesson', schedule_id=schedule.id)
+
                 Task.objects.create(
                     name=request.POST.get('task_name'),
+                    task_type=task_type,
                     lesson=lesson,
                     description=request.POST.get('task_description', '')
                 )
@@ -563,7 +845,13 @@ def teacher_lesson(request, schedule_id):
 
     lesson_types = LessonType.objects.all()
     files = LessonFile.objects.filter(lesson=lesson) if lesson else []
-    tasks = Task.objects.filter(lesson=lesson) if lesson else []
+    task_types = TaskType.objects.order_by('name')
+    tasks = (
+        Task.objects
+        .filter(lesson=lesson)
+        .select_related('task_type')
+        if lesson else []
+    )
 
     context = {
         'teacher': teacher,
@@ -573,7 +861,9 @@ def teacher_lesson(request, schedule_id):
         'lesson_types': lesson_types,
         'files': files,
         'tasks': tasks,
+        'task_types': task_types,
         'upload_form': upload_form,
+        'is_read_only': is_read_only,
     }
     return render(request, 'users/teacher/lesson.html', context)
 
@@ -586,12 +876,32 @@ def teacher_lesson_attendance(request, lesson_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson.objects.select_related(
+            'schedule__discipline__teacher',
+            'schedule__discipline__semester__status',
+            'schedule__discipline__group__number_set',
+        ),
+        id=lesson_id
+    )
     schedule = lesson.schedule
 
     if schedule.discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этому занятию.')
         return redirect('teacher_groups')
+
+    schedule.discipline.group.display_name = schedule.discipline.get_group_display_name()
+    is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
+
+    if request.method == 'POST' and is_read_only:
+        messages.error(
+            request,
+            'Закрытый семестр доступен только для просмотра.'
+        )
+        return redirect(
+            'teacher_lesson_attendance',
+            lesson_id=lesson.id
+        )
 
     students = Student.objects.filter(
         group=schedule.discipline.group
@@ -665,6 +975,7 @@ def teacher_lesson_attendance(request, lesson_id):
         'students': students,
         'attendance_types': attendance_types,
         'attendance_statuses': attendance_statuses,
+        'is_read_only': is_read_only,
     }
     return render(request, 'users/teacher/lesson_attendance.html', context)
 
@@ -677,7 +988,15 @@ def teacher_task_grades(request, task_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    task = get_object_or_404(Task, id=task_id)
+    task = get_object_or_404(
+        Task.objects.select_related(
+            'task_type',
+            'lesson__schedule__discipline__teacher',
+            'lesson__schedule__discipline__semester__status',
+            'lesson__schedule__discipline__group__number_set',
+        ),
+        id=task_id
+    )
     lesson = task.lesson
     schedule = lesson.schedule
 
@@ -685,8 +1004,36 @@ def teacher_task_grades(request, task_id):
         messages.error(request, 'У вас нет доступа к этому заданию.')
         return redirect('teacher_groups')
 
-    students = Student.objects.filter(group=schedule.discipline.group).select_related('user').order_by(
-        'user__last_name')
+    schedule.discipline.group.display_name = schedule.discipline.get_group_display_name()
+    is_read_only = schedule.discipline.semester.status.code == 'CLOSED'
+
+    if request.method == 'POST' and is_read_only:
+        messages.error(
+            request,
+            'Закрытый семестр доступен только для просмотра.'
+        )
+        return redirect(
+            'teacher_task_grades',
+            task_id=task.id
+        )
+
+    students = list(Student.objects.filter(
+        group=schedule.discipline.group
+    ).select_related('user').order_by('user__last_name'))
+
+    attendance_statuses = {
+        student.id: 'Присутствовал'
+        for student in students
+    }
+
+    attendances = Attendance.objects.filter(
+        lesson=lesson,
+        student__in=students,
+        attendance_type__isnull=False
+    ).select_related('attendance_type')
+
+    for attendance in attendances:
+        attendance_statuses[attendance.student_id] = attendance.attendance_type.name
 
     if request.method == 'POST':
         if 'delete_task' in request.POST:
@@ -695,30 +1042,92 @@ def teacher_task_grades(request, task_id):
             return redirect('teacher_journal', discipline_id=schedule.discipline.id)
 
         elif 'save_task' in request.POST:
+            task_type_id = request.POST.get('task_type', '')
+
+            if not task_type_id.isdigit():
+                messages.error(request, 'Выберите тип задания.')
+                return redirect('teacher_task_grades', task_id=task.id)
+
+            task_type = TaskType.objects.filter(id=task_type_id).first()
+
+            if not task_type:
+                messages.error(request, 'Выбранный тип задания не найден.')
+                return redirect('teacher_task_grades', task_id=task.id)
+
+            task.task_type = task_type
             task.name = request.POST.get('task_name')
             task.description = request.POST.get('task_description', '')
             task.save()
+
             messages.success(request, 'Задание сохранено.')
             return redirect('teacher_task_grades', task_id=task.id)
 
         elif 'save_grades' in request.POST:
+            submitted_grades = {}
+            submitted_required_student_ids = set()
+
             for student in students:
-                grade_value = request.POST.get(f'grade_{student.id}')
-                if grade_value and grade_value.isdigit() and 1 <= int(grade_value) <= 5:
-                    Grade.objects.update_or_create(
-                        task=task,
-                        student=student,
-                        defaults={'value': int(grade_value)}
-                    )
-                elif grade_value == '':
-                    Grade.objects.filter(task=task, student=student).delete()
+                grade_value = request.POST.get(f'grade_{student.id}', '').strip()
+
+                if f'required_{student.id}' in request.POST:
+                    submitted_required_student_ids.add(student.id)
+
+                if grade_value:
+                    if not grade_value.isdigit() or not 2 <= int(grade_value) <= 5:
+                        messages.error(
+                            request,
+                            'Оценка должна быть целым числом от 2 до 5.'
+                        )
+                        return redirect('teacher_task_grades', task_id=task.id)
+
+                    submitted_grades[student.id] = int(grade_value)
+
+            with transaction.atomic():
+                task.required_students.set(submitted_required_student_ids)
+
+                for student in students:
+                    grade_value = submitted_grades.get(student.id)
+
+                    if grade_value is not None:
+                        Grade.objects.update_or_create(
+                            task=task,
+                            student=student,
+                            defaults={'value': grade_value}
+                        )
+
+                    elif student.id in submitted_required_student_ids:
+                        Grade.objects.update_or_create(
+                            task=task,
+                            student=student,
+                            defaults={'value': 1}
+                        )
+
+                    else:
+                        Grade.objects.filter(
+                            task=task,
+                            student=student
+                        ).delete()
+
             messages.success(request, 'Оценки сохранены.')
+
             return redirect('teacher_task_grades', task_id=task.id)
 
-    grades = {}
-    for student in students:
-        grade = Grade.objects.filter(task=task, student=student).first()
-        grades[student.id] = grade.value if grade else None
+    grades = {
+        student.id: None
+        for student in students
+    }
+
+    for grade in Grade.objects.filter(task=task, student__in=students):
+        if 2 <= grade.value <= 5:
+            grades[grade.student_id] = grade.value
+
+    required_student_ids = set(
+        task.required_students.filter(
+            group=schedule.discipline.group
+        ).values_list('id', flat=True)
+    )
+
+    task_types = TaskType.objects.order_by('name')
 
     context = {
         'teacher': teacher,
@@ -727,11 +1136,17 @@ def teacher_task_grades(request, task_id):
         'schedule': schedule,
         'students': students,
         'grades': grades,
+        'attendance_statuses': attendance_statuses,
+        'required_student_ids': required_student_ids,
+        'task_types': task_types,
+        'is_read_only': is_read_only,
     }
+
     return render(request, 'users/teacher/task_grades.html', context)
 
 
 @login_required
+@require_POST
 def teacher_task_create(request, lesson_id):
     try:
         teacher = request.user.teacher
@@ -739,13 +1154,45 @@ def teacher_task_create(request, lesson_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    lesson = get_object_or_404(
+        Lesson.objects.select_related(
+            'schedule__discipline__teacher',
+            'schedule__discipline__semester__status'
+        ),
+        id=lesson_id
+    )
 
     if lesson.schedule.discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа.')
         return redirect('teacher_groups')
 
-    task = Task.objects.create(lesson=lesson, name='Новое задание')
+    if lesson.schedule.discipline.semester.status.code == 'CLOSED':
+        messages.error(
+            request,
+            'Закрытый семестр доступен только для просмотра.'
+        )
+        return redirect(
+            'teacher_journal',
+            discipline_id=lesson.schedule.discipline.id
+        )
+
+    task_type = TaskType.objects.order_by('id').first()
+
+    if not task_type:
+        messages.error(
+            request,
+            'В справочнике нет ни одного типа задания.'
+        )
+        return redirect(
+            'teacher_journal',
+            discipline_id=lesson.schedule.discipline.id
+        )
+
+    task = Task.objects.create(
+        lesson=lesson,
+        task_type=task_type,
+        name='Новое задание'
+    )
 
     return redirect('teacher_task_grades', task_id=task.id)
 
@@ -758,12 +1205,21 @@ def export_journal_excel(request, discipline_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline.objects.select_related(
+            'plan',
+            'group__number_set',
+            'semester',
+            'teacher'
+        ),
+        id=discipline_id
+    )
 
     if discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этой дисциплине.')
         return redirect('teacher_groups')
 
+    group_name = discipline.get_group_display_name()
     students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
 
     schedules = Schedule.objects.filter(
@@ -776,7 +1232,7 @@ def export_journal_excel(request, discipline_id):
         if schedule.has_lesson:
             schedule.lesson = lesson
             schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
-            schedule.tasks = Task.objects.filter(lesson=lesson)
+            schedule.tasks = Task.objects.filter(lesson=lesson).select_related('task_type')
             schedule.topic = lesson.topic if lesson.topic else '—'
         else:
             schedule.lesson_type = None
@@ -812,7 +1268,7 @@ def export_journal_excel(request, discipline_id):
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1 + len(schedules))
     row += 1
 
-    ws.cell(row=row, column=col).value = f"Группа: {discipline.group.name}"
+    ws.cell(row=row, column=col).value = f"Группа: {group_name}"
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + 1 + len(schedules))
     row += 1
 
@@ -879,7 +1335,7 @@ def export_journal_excel(request, discipline_id):
     for schedule in schedules:
         if schedule.has_lesson and schedule.tasks:
             for task in schedule.tasks:
-                ws.cell(row=second_header_row, column=col).value = task.name
+                ws.cell(row=second_header_row, column=col).value = f"{task.task_type.abbreviation} — {task.name}"
                 ws.cell(row=second_header_row, column=col).fill = header_fill
                 ws.cell(row=second_header_row, column=col).font = header_font
                 ws.cell(row=second_header_row, column=col).alignment = center_alignment
@@ -938,7 +1394,7 @@ def export_journal_excel(request, discipline_id):
         ws.column_dimensions[openpyxl.utils.get_column_letter(col_num)].width = 15
 
     current_date = datetime.now().strftime('%d.%m.%Y')
-    filename = f"{discipline.plan.name}_{discipline.group.name}_{current_date}.xlsx"
+    filename = f"{discipline.plan.name}_{group_name}_{current_date}.xlsx"
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
     wb.save(response)
@@ -953,12 +1409,21 @@ def export_journal_docx(request, discipline_id):
         messages.error(request, 'Профиль преподавателя не найден.')
         return redirect('home')
 
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline.objects.select_related(
+            'plan',
+            'group__number_set',
+            'semester',
+            'teacher'
+        ),
+        id=discipline_id
+    )
 
     if discipline.teacher != teacher:
         messages.error(request, 'У вас нет доступа к этой дисциплине.')
         return redirect('teacher_groups')
 
+    group_name = discipline.get_group_display_name()
     students = Student.objects.filter(group=discipline.group).select_related('user').order_by('user__last_name')
 
     schedules = Schedule.objects.filter(
@@ -971,7 +1436,7 @@ def export_journal_docx(request, discipline_id):
         if schedule.has_lesson:
             schedule.lesson = lesson
             schedule.lesson_type = lesson.lesson_type.name if lesson.lesson_type else '—'
-            schedule.tasks = Task.objects.filter(lesson=lesson)
+            schedule.tasks = Task.objects.filter(lesson=lesson).select_related('task_type')
             schedule.topic = lesson.topic if lesson.topic else '—'
         else:
             schedule.lesson_type = None
@@ -995,7 +1460,7 @@ def export_journal_docx(request, discipline_id):
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     doc.add_paragraph(f'Дисциплина: {discipline.plan.name}')
-    doc.add_paragraph(f'Группа: {discipline.group.name}')
+    doc.add_paragraph(f'Группа: {group_name}')
     doc.add_paragraph(f'Преподаватель: {teacher.user.last_name} {teacher.user.first_name} {teacher.user.patronymic}')
     doc.add_paragraph()
 
@@ -1042,7 +1507,7 @@ def export_journal_docx(request, discipline_id):
     for schedule in schedules:
         if schedule.has_lesson and schedule.tasks:
             for task in schedule.tasks:
-                table.cell(1, col).text = task.name
+                table.cell(1, col).text = f"{task.task_type.abbreviation} — {task.name}"
                 col += 1
         elif schedule.has_lesson:
             col += 1
@@ -1073,7 +1538,7 @@ def export_journal_docx(request, discipline_id):
                     run.font.size = Pt(10)
 
     current_date = datetime.now().strftime('%d.%m.%Y')
-    filename = f"{discipline.plan.name}_{discipline.group.name}_{current_date}.docx"
+    filename = f"{discipline.plan.name}_{group_name}_{current_date}.docx"
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
@@ -1084,6 +1549,1404 @@ def export_journal_docx(request, discipline_id):
 @staff_member_required
 def admin_dashboard(request):
     return render(request, 'users/admin/dashboard.html')
+
+
+@staff_member_required
+def admin_semesters(request):
+    semesters = AcademicSemester.objects.select_related('status').annotate(
+        discipline_count=Count('discipline')
+    ).order_by('-start_date')
+
+    search = request.GET.get('search', '')
+    if search:
+        semesters = semesters.filter(
+            Q(start_year__icontains=search) |
+            Q(status__name__icontains=search)
+        )
+
+    paginator = Paginator(semesters, 12)
+    page_number = request.GET.get('page')
+    semesters = paginator.get_page(page_number)
+    page_range = paginator.get_elided_page_range(
+        semesters.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
+    context = {
+        'semesters': semesters,
+        'search': search,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
+    }
+    return render(request, 'users/admin/semesters.html', context)
+
+
+@staff_member_required
+def admin_semester_create(request):
+    start_year = ''
+    semester_number = '1'
+    start_date = ''
+    end_date = ''
+
+    if request.method == 'POST':
+        start_year = request.POST.get('start_year')
+        semester_number = request.POST.get('semester_number')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+
+        if semester_number not in ['1', '2']:
+            messages.error(request, 'Выберите номер семестра.')
+        else:
+            draft_status = get_object_or_404(
+                AcademicSemesterStatus,
+                code='DRAFT'
+            )
+
+            semester = AcademicSemester(
+                start_year=start_year,
+                is_first_semester=semester_number == '1',
+                start_date=start_date,
+                end_date=end_date,
+                status=draft_status
+            )
+
+            try:
+                semester.full_clean()
+                semester.save()
+                messages.success(request, 'Учебный семестр добавлен.')
+                return redirect('admin_semesters')
+            except ValidationError as error:
+                for message in error.messages:
+                    messages.error(request, message)
+
+    context = {
+        'start_year': start_year,
+        'semester_number': semester_number,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'users/admin/semester_form.html', context)
+
+
+@staff_member_required
+def admin_semester_edit(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(request, 'Изменять можно только черновик семестра.')
+        return redirect('admin_semesters')
+
+    if Discipline.objects.filter(semester=semester).exists():
+        messages.error(
+            request,
+            'Подготовленный семестр нельзя изменять.'
+        )
+        return redirect('admin_semesters')
+
+    start_year = semester.start_year
+    semester_number = str(semester.number)
+    start_date = semester.start_date.strftime('%Y-%m-%d')
+    end_date = semester.end_date.strftime('%Y-%m-%d')
+
+    if request.method == 'POST':
+        start_year = request.POST.get('start_year')
+        semester_number = request.POST.get('semester_number')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date')
+
+        if semester_number not in ['1', '2']:
+            messages.error(request, 'Выберите номер семестра.')
+        else:
+            semester.start_year = start_year
+            semester.is_first_semester = semester_number == '1'
+            semester.start_date = start_date
+            semester.end_date = end_date
+
+            try:
+                semester.full_clean()
+                semester.save()
+                messages.success(request, 'Учебный семестр обновлён.')
+                return redirect('admin_semesters')
+            except ValidationError as error:
+                for message in error.messages:
+                    messages.error(request, message)
+
+    context = {
+        'semester': semester,
+        'start_year': start_year,
+        'semester_number': semester_number,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'users/admin/semester_form.html', context)
+
+
+@staff_member_required
+@require_POST
+def admin_semester_delete(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Удалить можно только черновик семестра.'
+        )
+        return redirect('admin_semesters')
+
+    disciplines = Discipline.objects.filter(semester=semester)
+
+    if Schedule.objects.filter(discipline__in=disciplines).exists():
+        messages.error(
+            request,
+            'Нельзя удалить семестр, так как для него уже создано расписание.'
+        )
+        return redirect('admin_semesters')
+
+    semester_name = str(semester)
+
+    with transaction.atomic():
+        disciplines.delete()
+        semester.delete()
+
+    messages.success(
+        request,
+        f'Черновик семестра «{semester_name}» удалён.'
+    )
+    return redirect('admin_semesters')
+
+
+@staff_member_required
+def admin_semester_curriculums(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    is_prepared = Discipline.objects.filter(semester=semester).exists()
+    is_editable = semester.status.code == 'DRAFT' and not is_prepared
+
+    selections = {}
+
+    for selection in semester.curriculum_selections.select_related(
+            'curriculum__specialty'
+    ).order_by(
+        'curriculum__specialty__name',
+        'curriculum__study_semester'
+    ):
+        key = (
+            selection.curriculum.specialty_id,
+            selection.curriculum.study_semester
+        )
+        selections[key] = selection.curriculum
+
+    available_curriculums = {}
+
+    if is_editable:
+        for curriculum in SpecialtyCurriculum.objects.filter(
+                is_approved=True,
+                is_archived=False
+        ).order_by('name'):
+            key = (
+                curriculum.specialty_id,
+                curriculum.study_semester
+            )
+
+            if key not in available_curriculums:
+                available_curriculums[key] = []
+
+            available_curriculums[key].append(curriculum)
+
+    curriculum_rows = []
+
+    if not is_editable:
+        for curriculum in selections.values():
+            curriculum_rows.append({
+                'specialty': curriculum.specialty,
+                'study_semester': curriculum.study_semester,
+                'curriculum': curriculum,
+                'available_curriculums': [],
+            })
+    else:
+        added_pairs = set()
+        groups = Group.objects.filter(
+            is_graduated=False
+        ).select_related(
+            'specialty'
+        ).order_by(
+            'specialty__name',
+            'year'
+        )
+
+        for group in groups:
+            study_semester = group.get_study_semester(semester)
+
+            if (
+                    study_semester < 1
+                    or study_semester > group.specialty.duration_semesters
+            ):
+                continue
+
+            key = (group.specialty_id, study_semester)
+
+            if key in added_pairs:
+                continue
+
+            added_pairs.add(key)
+            curriculum_rows.append({
+                'specialty': group.specialty,
+                'study_semester': study_semester,
+                'curriculum': selections.get(key),
+                'available_curriculums': available_curriculums.get(key, []),
+            })
+
+    required_count = len(curriculum_rows)
+    selected_count = 0
+
+    for row in curriculum_rows:
+        if row['curriculum']:
+            selected_count += 1
+
+    search = request.GET.get('search', '')
+    show_unassigned = request.GET.get('show_unassigned') == '1'
+
+    if search:
+        curriculum_rows = [
+            row for row in curriculum_rows
+            if (
+                    search.lower() in row['specialty'].name.lower()
+                    or search.lower() in row['specialty'].code.lower()
+            )
+        ]
+
+    if show_unassigned:
+        curriculum_rows = [
+            row for row in curriculum_rows
+            if not row['curriculum']
+        ]
+
+    paginator = Paginator(curriculum_rows, 10)
+    curriculum_rows = paginator.get_page(request.GET.get('page'))
+    page_range = paginator.get_elided_page_range(
+        curriculum_rows.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
+    can_prepare = required_count > 0 and selected_count == required_count and is_editable
+
+    context = {
+        'semester': semester,
+        'curriculum_rows': curriculum_rows,
+        'is_editable': is_editable,
+        'required_count': required_count,
+        'selected_count': selected_count,
+        'can_prepare': can_prepare,
+        'search': search,
+        'show_unassigned': show_unassigned,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
+    }
+    return render(request, 'users/admin/semester_curriculums.html', context)
+
+
+@staff_member_required
+@require_POST
+def admin_semester_curriculums_save(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Выбирать учебные планы можно только для черновика семестра.'
+        )
+        return redirect('admin_semesters')
+
+    page_number = request.POST.get('page')
+
+    if not page_number:
+
+        if request.POST.get('save') == '1':
+            page_number = request.POST.get('current_page') or '1'
+        else:
+            page_number = '1'
+
+    try:
+        page_number = max(int(page_number), 1)
+    except (TypeError, ValueError):
+        page_number = 1
+
+    search = request.POST.get('search', '').strip()
+    show_unassigned = request.POST.get('show_unassigned') == '1'
+
+    redirect_url = reverse(
+        'admin_semester_curriculums',
+        args=[semester.id]
+    )
+    query_parts = [f'page={page_number}']
+
+    if search:
+        query_parts.append(f'search={quote(search, safe="")}')
+
+    if show_unassigned:
+        query_parts.append('show_unassigned=1')
+
+    query_string = '&'.join(query_parts)
+    redirect_url = f'{redirect_url}?{query_string}'
+
+    if Discipline.objects.filter(semester=semester).exists():
+        messages.error(
+            request,
+            'После подготовки семестра изменять учебные планы нельзя.'
+        )
+        return redirect(redirect_url)
+
+    curriculums_to_save = []
+    added_pairs = set()
+    groups = Group.objects.filter(
+        is_graduated=False
+    ).select_related(
+        'specialty'
+    )
+
+    for group in groups:
+        study_semester = group.get_study_semester(semester)
+
+        if study_semester < 1 or study_semester > group.specialty.duration_semesters:
+            continue
+
+        key = (group.specialty_id, study_semester)
+
+        if key in added_pairs:
+            continue
+
+        added_pairs.add(key)
+
+        field_name = (
+            f'curriculum_{group.specialty_id}_{study_semester}'
+        )
+        curriculum_id = request.POST.get(field_name)
+
+        if not curriculum_id:
+            continue
+
+        curriculum = SpecialtyCurriculum.objects.filter(
+            id=curriculum_id,
+            specialty_id=group.specialty_id,
+            study_semester=study_semester,
+            is_approved=True,
+            is_archived=False
+        ).first()
+
+        if not curriculum:
+            messages.error(
+                request,
+                'Передан недоступный учебный план.'
+            )
+            return redirect(redirect_url)
+
+        curriculums_to_save.append((
+            key,
+            curriculum
+        ))
+
+    if not curriculums_to_save:
+
+        if request.POST.get('save') == '1':
+            messages.error(
+                request,
+                'Выберите хотя бы один учебный план.'
+            )
+
+        return redirect(redirect_url)
+
+    try:
+        with transaction.atomic():
+            for key, curriculum in curriculums_to_save:
+                specialty_id, study_semester = key
+
+                selection = semester.curriculum_selections.filter(
+                    curriculum__specialty_id=specialty_id,
+                    curriculum__study_semester=study_semester
+                ).first()
+
+                if selection:
+                    selection.curriculum = curriculum
+                else:
+                    selection = AcademicSemesterCurriculum(
+                        semester=semester,
+                        curriculum=curriculum
+                    )
+
+                selection.full_clean()
+                selection.save()
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+    else:
+        messages.success(
+            request,
+            f'Сохранено учебных планов: {len(curriculums_to_save)}.'
+        )
+
+    return redirect(redirect_url)
+
+
+@staff_member_required
+@require_POST
+def admin_semester_prepare(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Подготовить можно только черновик семестра.'
+        )
+        return redirect('admin_semesters')
+
+    if Discipline.objects.filter(semester=semester).exists():
+        messages.error(request, 'Семестр уже подготовлен.')
+        return redirect('admin_semester_curriculums', semester_id=semester.id)
+
+    selections = {}
+
+    for selection in semester.curriculum_selections.select_related('curriculum'):
+        key = (
+            selection.curriculum.specialty_id,
+            selection.curriculum.study_semester
+        )
+        selections[key] = selection.curriculum
+
+    groups = Group.objects.filter(
+        is_graduated=False
+    ).select_related('specialty')
+
+    disciplines = []
+
+    for group in groups:
+        study_semester = group.get_study_semester(semester)
+
+        if study_semester < 1 or study_semester > group.specialty.duration_semesters:
+            continue
+
+        key = (group.specialty_id, study_semester)
+        curriculum = selections.get(key)
+
+        if (
+                not curriculum
+                or not curriculum.is_approved
+                or curriculum.is_archived
+        ):
+            messages.error(
+                request,
+                f'Не выбран доступный учебный план для специальности '
+                f'{group.specialty.code}, {study_semester} семестр.'
+            )
+            return redirect(
+                'admin_semester_curriculums',
+                semester_id=semester.id
+            )
+
+        items = curriculum.items.select_related('plan')
+
+        if not items.exists():
+            messages.error(
+                request,
+                f'Учебный план «{curriculum.name}» не содержит дисциплин.'
+            )
+            return redirect(
+                'admin_semester_curriculums',
+                semester_id=semester.id
+            )
+
+        if items.exclude(
+                plan__is_approved=True,
+                plan__is_archived=False
+        ).exists():
+            messages.error(
+                request,
+                f'Учебный план «{curriculum.name}» содержит недоступные дисциплины.'
+            )
+            return redirect(
+                'admin_semester_curriculums',
+                semester_id=semester.id
+            )
+
+        for item in items:
+            disciplines.append(Discipline(
+                plan=item.plan,
+                group=group,
+                semester=semester,
+                teacher=None,
+                is_confirmed=False
+            ))
+
+    if not disciplines:
+        messages.error(
+            request,
+            'Для этого семестра нет дисциплин для подготовки.'
+        )
+        return redirect('admin_semester_curriculums', semester_id=semester.id)
+
+    with transaction.atomic():
+        Discipline.objects.bulk_create(disciplines)
+
+    messages.success(
+        request,
+        f'Семестр подготовлен. Добавлено дисциплин: {len(disciplines)}.'
+    )
+    return redirect('admin_semester_curriculums', semester_id=semester.id)
+
+
+@staff_member_required
+def admin_semester_disciplines(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Назначать преподавателей можно только для черновика семестра.'
+        )
+        return redirect('admin_semesters')
+
+    disciplines = Discipline.objects.filter(
+        semester=semester
+    ).select_related(
+        'plan',
+        'group__specialty',
+        'group__number_set',
+        'teacher__user'
+    )
+
+    if not disciplines.exists():
+        messages.error(
+            request,
+            'Сначала подготовьте дисциплины семестра.'
+        )
+        return redirect(
+            'admin_semester_curriculums',
+            semester_id=semester.id
+        )
+
+    total_count = disciplines.count()
+    assigned_count = disciplines.exclude(teacher__isnull=True).count()
+    can_open = total_count > 0 and assigned_count == total_count
+    search = request.GET.get('search', '')
+    show_unassigned = request.GET.get('show_unassigned') == '1'
+
+    if show_unassigned:
+        disciplines = disciplines.filter(teacher__isnull=True)
+
+    available_disciplines = disciplines
+    disciplines = []
+    group_names = {}
+    search_value = search.lower()
+
+    for discipline in available_disciplines:
+        if discipline.group_id not in group_names:
+            group_names[discipline.group_id] = (
+                discipline.group.get_display_name(semester)
+            )
+
+        discipline.group.display_name = group_names[
+            discipline.group_id
+        ]
+
+        if search:
+            teacher_name = ''
+
+            if discipline.teacher:
+                teacher_name = (
+                    discipline.teacher.user.get_full_name().lower()
+                )
+
+            if not (
+                search_value in discipline.plan.name.lower()
+                or search_value in discipline.group.display_name.lower()
+                or search_value in discipline.group.specialty.name.lower()
+                or search_value in discipline.group.specialty.code.lower()
+                or search_value in teacher_name
+            ):
+                continue
+
+        disciplines.append(discipline)
+
+    disciplines.sort(
+        key=lambda discipline: (
+            discipline.group.specialty.name,
+            discipline.group.display_name,
+            discipline.plan.name,
+        )
+    )
+
+    paginator = Paginator(disciplines, 10)
+    disciplines = paginator.get_page(request.GET.get('page'))
+    page_range = paginator.get_elided_page_range(
+        disciplines.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+
+    teachers = Teacher.objects.select_related('user').order_by(
+        'user__last_name',
+        'user__first_name',
+        'user__patronymic'
+    )
+
+    context = {
+        'semester': semester,
+        'disciplines': disciplines,
+        'teachers': teachers,
+        'total_count': total_count,
+        'assigned_count': assigned_count,
+        'search': search,
+        'show_unassigned': show_unassigned,
+        'page_range': page_range,
+        'ellipsis': paginator.ELLIPSIS,
+        'can_open': can_open,
+    }
+    return render(
+        request,
+        'users/admin/semester_disciplines.html',
+        context
+    )
+
+
+@staff_member_required
+@require_POST
+def admin_semester_disciplines_save(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Назначать преподавателей можно только для черновика семестра.'
+        )
+        return redirect('admin_semesters')
+
+    page_number = request.POST.get('page')
+
+    if not page_number:
+
+        if request.POST.get('save') == '1':
+            page_number = request.POST.get('current_page') or '1'
+        else:
+            page_number = '1'
+
+    try:
+        page_number = max(int(page_number), 1)
+    except (TypeError, ValueError):
+        page_number = 1
+
+    search = request.POST.get('search', '').strip()
+    show_unassigned = request.POST.get('show_unassigned') == '1'
+
+    redirect_url = reverse(
+        'admin_semester_disciplines',
+        args=[semester.id]
+    )
+    query_parts = [f'page={page_number}']
+
+    if search:
+        query_parts.append(f'search={quote(search, safe="")}')
+
+    if show_unassigned:
+        query_parts.append('show_unassigned=1')
+
+    query_string = '&'.join(query_parts)
+    redirect_url = f'{redirect_url}?{query_string}'
+
+    assignments = []
+
+    for field_name, teacher_id in request.POST.items():
+        if not field_name.startswith('teacher_'):
+            continue
+
+        try:
+            discipline_id = int(field_name.replace('teacher_', '', 1))
+        except ValueError:
+            messages.error(request, 'Передана неверная дисциплина.')
+            return redirect(redirect_url)
+
+        discipline = Discipline.objects.filter(
+            id=discipline_id,
+            semester=semester
+        ).first()
+
+        if not discipline:
+            messages.error(
+                request,
+                'Передана дисциплина другого семестра.'
+            )
+            return redirect(redirect_url)
+
+        teacher = None
+
+        if teacher_id:
+            teacher = Teacher.objects.filter(id=teacher_id).first()
+
+            if not teacher:
+                messages.error(
+                    request,
+                    'Передан недоступный преподаватель.'
+                )
+                return redirect(redirect_url)
+
+        assignments.append((discipline, teacher))
+
+    if not assignments:
+        if request.POST.get('save') == '1':
+            messages.error(
+                request,
+                'На странице нет дисциплин для сохранения.'
+            )
+
+        return redirect(redirect_url)
+
+    with transaction.atomic():
+        for discipline, teacher in assignments:
+            discipline.teacher = teacher
+            discipline.save(update_fields=['teacher'])
+
+    if request.POST.get('save') == '1':
+        messages.success(
+            request,
+            f'Сохранено дисциплин: {len(assignments)}.'
+        )
+
+    return redirect(redirect_url)
+
+
+@staff_member_required
+@require_POST
+def admin_semester_open(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'DRAFT':
+        messages.error(
+            request,
+            'Открыть можно только черновик семестра.'
+        )
+        return redirect('admin_semesters')
+
+    disciplines = Discipline.objects.filter(
+        semester=semester
+    ).select_related(
+        'group__specialty',
+        'group__number_set'
+    )
+
+    if not disciplines.exists():
+        messages.error(
+            request,
+            'Сначала подготовьте дисциплины семестра.'
+        )
+        return redirect(
+            'admin_semester_curriculums',
+            semester_id=semester.id
+        )
+
+    if disciplines.filter(teacher__isnull=True).exists():
+        messages.error(
+            request,
+            'Перед открытием семестра назначьте преподавателей всем дисциплинам.'
+        )
+        return redirect(
+            'admin_semester_disciplines',
+            semester_id=semester.id
+        )
+
+    try:
+        semester.full_clean()
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+
+        return redirect(
+            'admin_semester_disciplines',
+            semester_id=semester.id
+        )
+
+    groups = {}
+
+    for discipline in disciplines:
+        groups[discipline.group_id] = discipline.group
+
+    for group in groups.values():
+        group_name = group.get_display_name(semester)
+        study_semester = group.get_study_semester(semester)
+
+        if (
+                study_semester < 1
+                or study_semester > group.specialty.duration_semesters
+        ):
+            messages.error(
+                request,
+                f'Для группы {group_name} вычислен недоступный семестр обучения.'
+            )
+            return redirect(
+                'admin_semester_disciplines',
+                semester_id=semester.id
+            )
+
+        if group.number_set.specialty_id != group.specialty_id:
+            messages.error(
+                request,
+                f'Для группы {group_name} выбран комплект номеров другой специальности.'
+            )
+            return redirect(
+                'admin_semester_disciplines',
+                semester_id=semester.id
+            )
+
+        course = group.get_course(semester)
+
+        if not group.number_set.entries.filter(course=course).exists():
+            messages.error(
+                request,
+                f'В комплекте номеров группы {group_name} отсутствует номер для {course} курса.'
+            )
+            return redirect(
+                'admin_semester_disciplines',
+                semester_id=semester.id
+            )
+
+    open_status = get_object_or_404(
+        AcademicSemesterStatus,
+        code='OPEN'
+    )
+
+    with transaction.atomic():
+        disciplines.update(is_confirmed=True)
+        semester.status = open_status
+        semester.save(update_fields=['status'])
+
+    messages.success(
+        request,
+        'Учебный семестр открыт. Все дисциплины подтверждены.'
+    )
+    return redirect('admin_semesters')
+
+
+@staff_member_required
+@require_POST
+def admin_semester_close(request, semester_id):
+    semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id
+    )
+
+    if semester.status.code != 'OPEN':
+        messages.error(
+            request,
+            'Закрыть можно только открытый семестр.'
+        )
+        return redirect('admin_semesters')
+
+    closed_status = get_object_or_404(
+        AcademicSemesterStatus,
+        code='CLOSED'
+    )
+
+    groups = Group.objects.filter(
+        discipline__semester=semester,
+        is_graduated=False
+    ).select_related('specialty').distinct()
+
+    graduated_group_ids = []
+
+    for group in groups:
+        if group.get_study_semester(semester) == group.specialty.duration_semesters:
+            graduated_group_ids.append(group.id)
+
+    with transaction.atomic():
+        if graduated_group_ids:
+            Group.objects.filter(
+                id__in=graduated_group_ids
+            ).update(is_graduated=True)
+
+            StudentGroupMembership.objects.filter(
+                Q(end_date__isnull=True) |
+                Q(end_date__gt=semester.end_date),
+                group_id__in=graduated_group_ids,
+                start_date__lte=semester.end_date
+            ).update(end_date=semester.end_date)
+
+        semester.status = closed_status
+        semester.save(update_fields=['status'])
+
+    messages.success(
+        request,
+        'Учебный семестр закрыт.'
+    )
+    return redirect('admin_semesters')
+
+
+@staff_member_required
+def admin_curriculums(request):
+    specialties = Specialty.objects.order_by('name')
+    selected_specialty = None
+    study_semester = None
+    semester_numbers = []
+    curriculums = SpecialtyCurriculum.objects.none()
+    show_archived = request.GET.get('show_archived') == '1'
+
+    specialty_id = request.GET.get('specialty_id')
+    semester_number = request.GET.get('study_semester')
+
+    if specialty_id:
+        selected_specialty = get_object_or_404(
+            Specialty,
+            id=specialty_id
+        )
+        semester_numbers = range(
+            1,
+            selected_specialty.duration_semesters + 1
+        )
+
+    if selected_specialty and semester_number:
+        try:
+            study_semester = int(semester_number)
+        except ValueError:
+            messages.error(request, 'Выберите семестр обучения.')
+        else:
+            if study_semester < 1 or study_semester > selected_specialty.duration_semesters:
+                messages.error(request, 'Выбран неверный семестр обучения.')
+                study_semester = None
+            else:
+                curriculums = SpecialtyCurriculum.objects.filter(
+                    specialty=selected_specialty,
+                    study_semester=study_semester
+                ).annotate(
+                    item_count=Count('items')
+                ).order_by(
+                    'name'
+                )
+
+                if not show_archived:
+                    curriculums = curriculums.filter(is_archived=False)
+
+    context = {
+        'specialties': specialties,
+        'selected_specialty': selected_specialty,
+        'semester_numbers': semester_numbers,
+        'study_semester': study_semester,
+        'curriculums': curriculums,
+        'show_archived': show_archived,
+    }
+    return render(request, 'users/admin/curriculums.html', context)
+
+
+@staff_member_required
+def admin_curriculum_create(request):
+    specialties = Specialty.objects.order_by('name')
+    selected_specialty = None
+    name = ''
+    study_semester = request.GET.get('study_semester', '')
+
+    specialty_id = request.GET.get('specialty_id')
+
+    if specialty_id:
+        selected_specialty = get_object_or_404(
+            Specialty,
+            id=specialty_id
+        )
+
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        study_semester = request.POST.get('study_semester')
+        selected_specialty = get_object_or_404(
+            Specialty,
+            id=request.POST.get('specialty_id')
+        )
+
+        curriculum = SpecialtyCurriculum(
+            name=name,
+            specialty=selected_specialty,
+            study_semester=study_semester
+        )
+
+        try:
+            curriculum.full_clean()
+            curriculum.save()
+            messages.success(request, 'Учебный план добавлен.')
+            return redirect(
+                f"{reverse('admin_curriculums')}?"
+                f"specialty_id={curriculum.specialty_id}&"
+                f"study_semester={curriculum.study_semester}"
+            )
+        except ValidationError as error:
+            for message in error.messages:
+                messages.error(request, message)
+
+    context = {
+        'specialties': specialties,
+        'selected_specialty': selected_specialty,
+        'name': name,
+        'study_semester': study_semester,
+    }
+    return render(request, 'users/admin/curriculum_form.html', context)
+
+
+@staff_member_required
+def admin_curriculum_edit(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum.objects.select_related('specialty'),
+        id=curriculum_id
+    )
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Изменять можно только черновик учебного плана.'
+        )
+        return redirect(
+            f"{reverse('admin_curriculums')}?"
+            f"specialty_id={curriculum.specialty_id}&"
+            f"study_semester={curriculum.study_semester}"
+        )
+
+    specialties = Specialty.objects.order_by('name')
+    selected_specialty = curriculum.specialty
+    name = curriculum.name
+    study_semester = curriculum.study_semester
+    return_specialty_id = curriculum.specialty_id
+    return_study_semester = curriculum.study_semester
+
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        study_semester = request.POST.get('study_semester')
+        selected_specialty = get_object_or_404(
+            Specialty,
+            id=request.POST.get('specialty_id')
+        )
+
+        curriculum.name = name
+        curriculum.specialty = selected_specialty
+        curriculum.study_semester = study_semester
+
+        try:
+            curriculum.full_clean()
+            curriculum.save()
+            messages.success(request, 'Учебный план изменён.')
+            return redirect(
+                f"{reverse('admin_curriculums')}?"
+                f"specialty_id={curriculum.specialty_id}&"
+                f"study_semester={curriculum.study_semester}"
+            )
+        except ValidationError as error:
+            for message in error.messages:
+                messages.error(request, message)
+
+    context = {
+        'curriculum': curriculum,
+        'specialties': specialties,
+        'selected_specialty': selected_specialty,
+        'name': name,
+        'study_semester': study_semester,
+        'return_specialty_id': return_specialty_id,
+        'return_study_semester': return_study_semester,
+    }
+    return render(request, 'users/admin/curriculum_form.html', context)
+
+
+@staff_member_required
+def admin_curriculum_detail(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum.objects.select_related('specialty'),
+        id=curriculum_id
+    )
+
+    item_search = request.GET.get('item_search', '')
+    items = curriculum.items.select_related('plan').order_by('plan__name')
+
+    if item_search:
+        items = items.filter(plan__name__icontains=item_search)
+
+    item_paginator = Paginator(items, 8)
+    items = item_paginator.get_page(request.GET.get('item_page'))
+    item_page_range = item_paginator.get_elided_page_range(
+        items.number,
+        on_each_side=2,
+        on_ends=1,
+    )
+    item_ellipsis = item_paginator.ELLIPSIS
+
+    is_draft = not curriculum.is_approved and not curriculum.is_archived
+    available_search = request.GET.get('available_search', '')
+    available_plans = DisciplinePlan.objects.none()
+    available_page_range = []
+    available_ellipsis = None
+
+    if is_draft:
+        item_plan_ids = curriculum.items.values_list('plan_id', flat=True)
+        available_plans = DisciplinePlan.objects.filter(
+            is_approved=True,
+            is_archived=False
+        ).exclude(
+            id__in=item_plan_ids
+        ).order_by(
+            'name'
+        )
+
+        if available_search:
+            available_plans = available_plans.filter(
+                name__icontains=available_search
+            )
+
+        available_paginator = Paginator(available_plans, 8)
+        available_plans = available_paginator.get_page(
+            request.GET.get('available_page')
+        )
+        available_page_range = available_paginator.get_elided_page_range(
+            available_plans.number,
+            on_each_side=2,
+            on_ends=1,
+        )
+        available_ellipsis = available_paginator.ELLIPSIS
+
+    context = {
+        'curriculum': curriculum,
+        'items': items,
+        'item_search': item_search,
+        'item_page_range': item_page_range,
+        'item_ellipsis': item_ellipsis,
+        'is_draft': is_draft,
+        'available_plans': available_plans,
+        'available_search': available_search,
+        'available_page_range': available_page_range,
+        'available_ellipsis': available_ellipsis,
+    }
+    return render(request, 'users/admin/curriculum_detail.html', context)
+
+
+@staff_member_required
+@require_POST
+def admin_curriculum_approve(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Утвердить можно только черновик учебного плана.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    items = curriculum.items.select_related('plan')
+
+    if not items.exists():
+        messages.error(
+            request,
+            'Нельзя утвердить учебный план без дисциплин.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    if items.exclude(
+            plan__is_approved=True,
+            plan__is_archived=False
+    ).exists():
+        messages.error(
+            request,
+            'Все дисциплины должны быть утверждены и не находиться в архиве.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    curriculum.is_approved = True
+
+    try:
+        curriculum.full_clean()
+        curriculum.save(update_fields=['is_approved'])
+        messages.success(request, 'Учебный план утверждён.')
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+
+    return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+
+@staff_member_required
+@require_POST
+def admin_curriculum_delete(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Удалить можно только черновик учебного плана.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    specialty_id = curriculum.specialty_id
+    study_semester = curriculum.study_semester
+
+    curriculum.delete()
+    messages.success(request, 'Черновик учебного плана удалён.')
+    return redirect(
+        f"{reverse('admin_curriculums')}?"
+        f"specialty_id={specialty_id}&"
+        f"study_semester={study_semester}"
+    )
+
+
+@staff_member_required
+@require_POST
+def admin_curriculum_archive(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if not curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Отправить в архив можно только утверждённый учебный план.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    if curriculum.semester_selections.filter(
+            semester__status__code='DRAFT'
+    ).exists():
+        messages.error(
+            request,
+            'Учебный план выбран для чернового учебного семестра и не может быть архивирован.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    specialty_id = curriculum.specialty_id
+    study_semester = curriculum.study_semester
+
+    curriculum.is_archived = True
+    curriculum.save(update_fields=['is_archived'])
+    messages.success(request, 'Учебный план отправлен в архив.')
+    return redirect(
+        f"{reverse('admin_curriculums')}?"
+        f"specialty_id={specialty_id}&"
+        f"study_semester={study_semester}"
+    )
+
+
+@staff_member_required
+@require_POST
+def admin_curriculum_restore(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if not curriculum.is_approved or not curriculum.is_archived:
+        messages.error(
+            request,
+            'Восстановить можно только утверждённый архивный учебный план.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    if curriculum.items.exclude(
+            plan__is_approved=True,
+            plan__is_archived=False
+    ).exists():
+        messages.error(
+            request,
+            'Нельзя восстановить учебный план, пока одна из его дисциплин находится в архиве.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    specialty_id = curriculum.specialty_id
+    study_semester = curriculum.study_semester
+
+    curriculum.is_archived = False
+    curriculum.save(update_fields=['is_archived'])
+    messages.success(request, 'Учебный план восстановлен из архива.')
+    return redirect(
+        f"{reverse('admin_curriculums')}?"
+        f"specialty_id={specialty_id}&"
+        f"study_semester={study_semester}"
+    )
+
+
+@staff_member_required
+@require_POST
+def admin_curriculum_item_add(request, curriculum_id):
+    curriculum = get_object_or_404(
+        SpecialtyCurriculum,
+        id=curriculum_id
+    )
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Изменять состав можно только у черновика учебного плана.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    plan = get_object_or_404(
+        DisciplinePlan,
+        id=request.POST.get('plan_id'),
+        is_approved=True,
+        is_archived=False
+    )
+
+    item = SpecialtyCurriculumItem(
+        curriculum=curriculum,
+        plan=plan
+    )
+
+    try:
+        item.full_clean()
+        item.save()
+        messages.success(request, 'Дисциплина добавлена в учебный план.')
+    except ValidationError as error:
+        for message in error.messages:
+            messages.error(request, message)
+
+    return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+
+@staff_member_required
+@require_POST
+def admin_curriculum_item_delete(request, item_id):
+    item = get_object_or_404(
+        SpecialtyCurriculumItem.objects.select_related('curriculum'),
+        id=item_id
+    )
+    curriculum = item.curriculum
+
+    if curriculum.is_approved or curriculum.is_archived:
+        messages.error(
+            request,
+            'Изменять состав можно только у черновика учебного плана.'
+        )
+        return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
+
+    item.delete()
+    messages.success(request, 'Дисциплина удалена из учебного плана.')
+    return redirect('admin_curriculum_detail', curriculum_id=curriculum.id)
 
 
 @staff_member_required
@@ -1103,9 +2966,10 @@ def get_schedule_conflicts(
         lesson_number=lesson_number
     ).select_related(
         'discipline__plan',
-        'discipline__group',
+        'discipline__group__number_set',
+        'discipline__semester',
         'discipline__teacher__user',
-        'classroom'
+        'classroom',
     )
 
     if exclude_schedule_id:
@@ -1121,12 +2985,13 @@ def get_schedule_conflicts(
 
 @staff_member_required
 def admin_schedule_create(request):
+    semester_id = request.GET.get('semester_id')
     group_id = request.GET.get('group_id')
 
-    if not group_id:
+    if not semester_id or not group_id:
         messages.error(
             request,
-            'Сначала выберите группу в расписании.'
+            'Сначала выберите семестр и группу в расписании.'
         )
         return redirect(
             f"{reverse('schedule_list')}?manage=1"
@@ -1135,23 +3000,44 @@ def admin_schedule_create(request):
     initial_date = request.GET.get('date', '')
     initial_lesson_number = request.GET.get('lesson_number', '')
 
+    selected_semester = get_object_or_404(
+        AcademicSemester.objects.select_related('status'),
+        id=semester_id,
+        status__code='OPEN'
+    )
+
     selected_group = get_object_or_404(
-        Group,
+        Group.objects.filter(
+            discipline__semester=selected_semester
+        ).distinct(),
         id=group_id
     )
+    selected_group.display_name = selected_group.get_display_name(selected_semester)
 
     disciplines = Discipline.objects.select_related(
         'plan',
         'group',
-        'teacher__user'
-    ).filter(group=selected_group)
+        'teacher__user',
+        'semester'
+    ).filter(
+        group=selected_group,
+        semester=selected_semester,
+        is_confirmed=True
+    )
 
     classrooms = Classroom.objects.all()
 
     return_url = (
-        f"{reverse('schedule_list')}?group_id={selected_group.id}"
-        f"&date={initial_date}&manage=1"
+        f"{reverse('schedule_list')}?semester_id={selected_semester.id}"
+        f"&group_id={selected_group.id}&date={initial_date}&manage=1"
     )
+
+    if not disciplines.exists():
+        messages.error(
+            request,
+            'В выбранной группе нет подтверждённых дисциплин открытого семестра.'
+        )
+        return redirect(return_url)
 
     context = {
         'disciplines': disciplines,
@@ -1161,6 +3047,7 @@ def admin_schedule_create(request):
         'return_url': return_url,
         'reset_url': request.get_full_path(),
         'selected_group': selected_group,
+        'selected_semester': selected_semester,
     }
 
     if request.method == 'POST':
@@ -1172,7 +3059,9 @@ def admin_schedule_create(request):
         discipline = get_object_or_404(
             Discipline,
             id=discipline_id,
-            group=selected_group
+            group=selected_group,
+            semester=selected_semester,
+            is_confirmed=True
         )
 
         classroom = get_object_or_404(
@@ -1187,6 +3076,24 @@ def admin_schedule_create(request):
         context['initial_lesson_number'] = lesson_number
 
         try:
+            schedule_date = datetime.strptime(date, '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            messages.error(request, 'Введите корректную дату занятия.')
+            return render(request, 'users/admin/schedule_form.html', context)
+
+        if (
+            schedule_date < discipline.semester.start_date or
+            schedule_date > discipline.semester.end_date
+        ):
+            messages.error(
+                request,
+                f'Дата занятия должна быть в период с '
+                f'{discipline.semester.start_date.strftime("%d.%m.%Y")} по '
+                f'{discipline.semester.end_date.strftime("%d.%m.%Y")}.'
+            )
+            return render(request, 'users/admin/schedule_form.html', context)
+
+        try:
             lesson_number = int(lesson_number)
             if lesson_number < 1 or lesson_number > 7:
                 messages.error(request, 'Номер пары должен быть от 1 до 7.')
@@ -1198,7 +3105,7 @@ def admin_schedule_create(request):
         classroom_conflicts, teacher_conflicts = get_schedule_conflicts(
             discipline,
             classroom,
-            date,
+            schedule_date,
             lesson_number
         )
 
@@ -1220,12 +3127,13 @@ def admin_schedule_create(request):
         schedule = Schedule.objects.create(
             discipline=discipline,
             classroom=classroom,
-            date=date,
+            date=schedule_date,
             lesson_number=lesson_number
         )
         messages.success(request, 'Расписание добавлено.')
         return redirect(
-            f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
+            f"{reverse('schedule_list')}?semester_id={selected_semester.id}"
+            f"&group_id={schedule.discipline.group_id}&date={date}&manage=1"
         )
 
     return render(request, 'users/admin/schedule_form.html', context)
@@ -1233,13 +3141,37 @@ def admin_schedule_create(request):
 
 @staff_member_required
 def admin_schedule_edit(request, schedule_id):
-    schedule = get_object_or_404(Schedule, id=schedule_id)
-    has_lesson = Lesson.objects.filter(schedule=schedule).exists()
+    schedule = get_object_or_404(
+        Schedule.objects.select_related(
+            'discipline__semester__status',
+            'discipline__group__number_set'
+        ),
+        id=schedule_id
+    )
     return_url = (
-        f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}"
+        f"{reverse('schedule_list')}?semester_id={schedule.discipline.semester_id}"
+        f"&group_id={schedule.discipline.group_id}"
         f"&date={schedule.date.strftime('%Y-%m-%d')}&manage=1"
     )
-    disciplines = Discipline.objects.select_related('plan', 'group', 'teacher__user').filter(group=schedule.discipline.group)
+
+    if schedule.discipline.semester.status.code != 'OPEN':
+        messages.error(
+            request,
+            'Изменять расписание можно только в открытом семестре.'
+        )
+        return redirect(return_url)
+
+    schedule.discipline.group.display_name = schedule.discipline.get_group_display_name()
+    has_lesson = Lesson.objects.filter(schedule=schedule).exists()
+    disciplines = Discipline.objects.select_related(
+        'plan',
+        'group',
+        'teacher__user',
+        'semester'
+    ).filter(
+        group=schedule.discipline.group,
+        semester=schedule.discipline.semester
+    )
     classrooms = Classroom.objects.all()
 
     context = {
@@ -1259,7 +3191,8 @@ def admin_schedule_edit(request, schedule_id):
             discipline = get_object_or_404(
                 Discipline,
                 id=request.POST.get('discipline_id'),
-                group=schedule.discipline.group
+                group=schedule.discipline.group,
+                semester=schedule.discipline.semester
             )
 
         classroom_id = request.POST.get('classroom_id')
@@ -1321,18 +3254,38 @@ def admin_schedule_edit(request, schedule_id):
         schedule.save()
         messages.success(request, 'Расписание обновлено.')
         return redirect(
-            f"{reverse('schedule_list')}?group_id={schedule.discipline.group_id}&date={date}&manage=1"
+            f"{reverse('schedule_list')}?semester_id={schedule.discipline.semester_id}"
+            f"&group_id={schedule.discipline.group_id}&date={date}&manage=1"
         )
+
     return render(request, 'users/admin/schedule_form.html', context)
 
 
 @staff_member_required
 @require_POST
 def admin_schedule_delete(request, schedule_id):
-    schedule = get_object_or_404(Schedule, id=schedule_id)
+    schedule = get_object_or_404(
+        Schedule.objects.select_related(
+            'discipline__semester__status'
+        ),
+        id=schedule_id
+    )
 
+    semester_id = schedule.discipline.semester_id
     group_id = schedule.discipline.group_id
     date = schedule.date.strftime('%Y-%m-%d')
+
+    return_url = (
+        f"{reverse('schedule_list')}?semester_id={semester_id}"
+        f"&group_id={group_id}&date={date}&manage=1"
+    )
+
+    if schedule.discipline.semester.status.code != 'OPEN':
+        messages.error(
+            request,
+            'Изменять расписание можно только в открытом семестре.'
+        )
+        return redirect(return_url)
 
     if Lesson.objects.filter(schedule=schedule).exists():
         messages.error(
@@ -1343,14 +3296,16 @@ def admin_schedule_delete(request, schedule_id):
 
     schedule.delete()
     messages.success(request, 'Расписание удалено.')
-    return redirect(
-        f"{reverse('schedule_list')}?group_id={group_id}&date={date}&manage=1"
-    )
+    return redirect(return_url)
 
 
 @staff_member_required
 def admin_discipline_plans(request):
+    show_archived = request.GET.get('show_archived') == '1'
     plans = DisciplinePlan.objects.all().order_by('name')
+
+    if not show_archived:
+        plans = plans.filter(is_archived=False)
 
     search = request.GET.get('search', '')
     if search:
@@ -1370,6 +3325,7 @@ def admin_discipline_plans(request):
         'search': search,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'show_archived': show_archived,
     }
     return render(request, 'users/admin/discipline_plans.html', context)
 
@@ -1379,10 +3335,12 @@ def admin_discipline_plan_create(request):
     if request.method == 'POST':
         name = request.POST.get('name')
         total_hours = request.POST.get('total_hours')
+        is_approved = request.POST.get('is_approved') == 'on'
 
         DisciplinePlan.objects.create(
             name=name,
-            total_hours=total_hours
+            total_hours=total_hours,
+            is_approved=is_approved
         )
         messages.success(request, 'План дисциплины добавлен.')
         return redirect('admin_discipline_plans')
@@ -1394,9 +3352,14 @@ def admin_discipline_plan_create(request):
 def admin_discipline_plan_edit(request, plan_id):
     plan = get_object_or_404(DisciplinePlan, id=plan_id)
 
+    if plan.is_approved:
+        messages.error(request, 'Утверждённый план нельзя изменять.')
+        return redirect('admin_discipline_plans')
+
     if request.method == 'POST':
         plan.name = request.POST.get('name')
         plan.total_hours = request.POST.get('total_hours')
+        plan.is_approved = request.POST.get('is_approved') == 'on'
         plan.save()
         messages.success(request, 'План дисциплины обновлён.')
         return redirect('admin_discipline_plans')
@@ -1411,6 +3374,10 @@ def admin_discipline_plan_edit(request, plan_id):
 def admin_discipline_plan_delete(request, plan_id):
     plan = get_object_or_404(DisciplinePlan, id=plan_id)
 
+    if plan.is_approved:
+        messages.error(request, 'Утверждённый план нельзя удалить.')
+        return redirect('admin_discipline_plans')
+
     if Discipline.objects.filter(plan=plan).exists():
         messages.error(request, 'Нельзя удалить план, так как он используется в дисциплинах.')
         return redirect('admin_discipline_plans')
@@ -1421,23 +3388,112 @@ def admin_discipline_plan_delete(request, plan_id):
 
 
 @staff_member_required
-def admin_disciplines(request):
-    disciplines = Discipline.objects.select_related(
-        'plan',
-        'group',
-        'teacher__user',
-    ).order_by(
-        'plan__name',
-        'group__name',
-    )
+@require_POST
+def admin_discipline_plan_archive(request, plan_id):
+    plan = get_object_or_404(DisciplinePlan, id=plan_id)
 
+    if plan.is_archived:
+        plan.is_archived = False
+        plan.save(update_fields=['is_archived'])
+        messages.success(request, 'План дисциплины восстановлен из архива.')
+        return redirect('admin_discipline_plans')
+
+    if not plan.is_approved:
+        messages.error(request, 'В архив можно отправить только утверждённый план.')
+        return redirect('admin_discipline_plans')
+
+    if Discipline.objects.filter(
+        plan=plan,
+        semester__status__code='OPEN'
+    ).exists():
+        messages.error(
+            request,
+            'План используется в текущем открытом семестре и не может быть архивирован.'
+        )
+        return redirect('admin_discipline_plans')
+
+    if SpecialtyCurriculumItem.objects.filter(
+            plan=plan,
+            curriculum__is_approved=True,
+            curriculum__is_archived=False
+    ).exists():
+        messages.error(
+            request,
+            'План входит в утверждённый учебный план специальности и не может быть архивирован.'
+        )
+        return redirect('admin_discipline_plans')
+
+    plan.is_archived = True
+    plan.save(update_fields=['is_archived'])
+    messages.success(request, 'План дисциплины отправлен в архив.')
+    return redirect('admin_discipline_plans')
+
+
+@staff_member_required
+def admin_disciplines(request):
+    semesters = AcademicSemester.objects.select_related(
+        'status'
+    ).order_by('-start_date')
+
+    semester_id = request.GET.get('semester_id')
+    if semester_id:
+        selected_semester = get_object_or_404(
+            semesters,
+            id=semester_id
+        )
+    else:
+        selected_semester = semesters.exclude(
+            status__code='DRAFT'
+        ).first()
+
+    disciplines = []
     search = request.GET.get('search', '')
-    if search:
-        disciplines = disciplines.filter(
-            Q(plan__name__icontains=search) |
-            Q(group__name__icontains=search) |
-            Q(teacher__user__last_name__icontains=search) |
-            Q(teacher__user__first_name__icontains=search)
+
+    if selected_semester:
+        available_disciplines = Discipline.objects.filter(
+            semester=selected_semester
+        ).select_related(
+            'plan',
+            'group__number_set',
+            'teacher__user',
+            'semester__status',
+        )
+
+        group_names = {}
+        search_value = search.lower()
+
+        for discipline in available_disciplines:
+            if discipline.group_id not in group_names:
+                group_names[discipline.group_id] = (
+                    discipline.group.get_display_name(selected_semester)
+                )
+
+            discipline.group.display_name = group_names[
+                discipline.group_id
+            ]
+
+            if search:
+                teacher_name = ''
+
+                if discipline.teacher:
+                    teacher_name = (
+                        discipline.teacher.user.get_full_name().lower()
+                    )
+
+                if not (
+                    search_value in discipline.plan.name.lower()
+                    or search_value in discipline.group.display_name.lower()
+                    or search_value in teacher_name
+                ):
+                    continue
+
+            disciplines.append(discipline)
+
+        disciplines.sort(
+            key=lambda discipline: (
+                discipline.plan.name,
+                discipline.group.display_name,
+            )
         )
 
     paginator = Paginator(disciplines, 12)
@@ -1454,70 +3510,71 @@ def admin_disciplines(request):
         'search': search,
         'page_range': page_range,
         'ellipsis': paginator.ELLIPSIS,
+        'semesters': semesters,
+        'selected_semester': selected_semester,
     }
     return render(request, 'users/admin/disciplines.html', context)
 
 
 @staff_member_required
-def admin_discipline_create(request):
-    if request.method == 'POST':
-        plan_id = request.POST.get('plan_id')
-        group_id = request.POST.get('group_id')
-        teacher_id = request.POST.get('teacher_id')
-
-        Discipline.objects.create(
-            plan_id=plan_id,
-            group_id=group_id,
-            teacher_id=teacher_id
-        )
-        messages.success(request, 'Дисциплина добавлена.')
-        return redirect('admin_disciplines')
-
-    plans = DisciplinePlan.objects.all()
-    groups = Group.objects.all()
-    teachers = Teacher.objects.select_related('user').all()
-
-    context = {
-        'plans': plans,
-        'groups': groups,
-        'teachers': teachers,
-    }
-    return render(request, 'users/admin/discipline_form.html', context)
-
-
-@staff_member_required
 def admin_discipline_edit(request, discipline_id):
-    discipline = get_object_or_404(Discipline, id=discipline_id)
+    discipline = get_object_or_404(
+        Discipline.objects.select_related(
+            'semester__status',
+            'group__number_set'
+        ),
+        id=discipline_id
+    )
+
+    discipline.group.display_name = discipline.get_group_display_name()
+
+    return_url = (
+        f"{reverse('admin_disciplines')}?semester_id={discipline.semester_id}"
+    )
+
+    if discipline.semester.status.code == 'CLOSED':
+        messages.error(
+            request,
+            'Дисциплины закрытого семестра доступны только для просмотра.'
+        )
+        return redirect(return_url)
 
     if request.method == 'POST':
-        discipline.plan_id = request.POST.get('plan_id')
-        discipline.group_id = request.POST.get('group_id')
-        discipline.teacher_id = request.POST.get('teacher_id')
-        discipline.save()
-        messages.success(request, 'Дисциплина обновлена.')
-        return redirect('admin_disciplines')
+        teacher_id = request.POST.get('teacher_id')
+        teacher = None
 
-    plans = DisciplinePlan.objects.all()
-    groups = Group.objects.all()
+        if teacher_id:
+            try:
+                teacher = Teacher.objects.get(id=teacher_id)
+            except (Teacher.DoesNotExist, ValueError):
+                messages.error(
+                    request,
+                    'Выбран недоступный преподаватель.'
+                )
+                return redirect(
+                    'admin_discipline_edit',
+                    discipline_id=discipline.id
+                )
+
+        if discipline.semester.status.code == 'OPEN' and not teacher:
+            messages.error(
+                request,
+                'У дисциплины открытого семестра должен быть преподаватель.'
+            )
+            return redirect(
+                'admin_discipline_edit',
+                discipline_id=discipline.id
+            )
+
+        discipline.teacher = teacher
+        discipline.save(update_fields=['teacher'])
+        messages.success(request, 'Преподаватель дисциплины обновлён.')
+        return redirect(return_url)
+
     teachers = Teacher.objects.select_related('user').all()
 
     context = {
         'discipline': discipline,
-        'plans': plans,
-        'groups': groups,
         'teachers': teachers,
     }
     return render(request, 'users/admin/discipline_form.html', context)
-
-
-@staff_member_required
-def admin_discipline_delete(request, discipline_id):
-    discipline = get_object_or_404(Discipline, id=discipline_id)
-
-    if Schedule.objects.filter(discipline=discipline).exists():
-        messages.error(request, 'Нельзя удалить дисциплину, так как она используется в расписании.')
-        return redirect('admin_disciplines')
-
-    discipline.delete()
-    messages.success(request, 'Дисциплина удалена.')
-    return redirect('admin_disciplines')

@@ -1,0 +1,192 @@
+{% extends "journal/base.html" %}
+
+{% block title %}Учебные планы семестра{% endblock %}
+
+{% block breadcrumbs %}
+
+    <li class="breadcrumb-item"><a href="{% url 'home' %}">Главная</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">Панель администратора</a></li>
+    <li class="breadcrumb-item"><a href="{% url 'admin_semesters' %}">Учебные семестры</a></li>
+    <li class="breadcrumb-item active">Учебные планы</li>
+
+{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h4 class="mb-0">
+            <i class="bi bi-list-check"></i>
+            Учебные планы на {{ semester.start_year }}/{{ semester.start_year|add:"1" }} учебный год,
+            {{ semester.number }} семестр
+        </h4>
+    </div>
+
+    <div class="card-body">
+        {% if not is_editable %}
+            <div class="alert alert-success">
+                Семестр подготовлен. Состав дисциплин зафиксирован.
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                Выбрано учебных планов: {{ selected_count }} из {{ required_count }}.
+            </div>
+        {% endif %}
+
+            {% if not is_editable %}
+
+            <form method="get">
+        {% else %}
+            <form id="semesterCurriculumsForm" method="post" action="{% url 'admin_semester_curriculums_save' semester.id %}">
+                {% csrf_token %}
+
+                <input type="hidden" name="current_page" value="{{ curriculum_rows.number }}">
+        {% endif %}
+
+                <div class="row g-2 mb-4">
+                    <div class="col-md-7">
+                        <input type="text" name="search" class="form-control" placeholder="Поиск по названию или коду специальности..." value="{{ search }}">
+                    </div>
+
+                    <div class="col-md-3 d-flex align-items-center">
+                        <div class="form-check form-switch">
+                            <input type="checkbox" name="show_unassigned" value="1" class="form-check-input" id="showUnassigned" {% if show_unassigned %}checked{% endif %}>
+                            <label class="form-check-label" for="showUnassigned">
+                                Только не назначенные
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="col-md-2">
+                        <button type="submit" name="page" value="1" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i> Искать
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Специальность</th>
+                                <th>Семестр обучения</th>
+                                <th>Учебный план</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in curriculum_rows %}
+                                <tr>
+                                    <td>{{ row.specialty.code }} — {{ row.specialty.name }}</td>
+                                    <td>{{ row.study_semester }}</td>
+                                    <td>
+                                        {% if not is_editable %}
+
+                                            {% if row.curriculum %}
+                                                <a href="{% url 'admin_curriculum_detail' row.curriculum.id %}">
+                                                    {{ row.curriculum.name }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">Не выбран</span>
+                                            {% endif %}
+
+                                        {% elif row.available_curriculums %}
+                                            <select name="curriculum_{{ row.specialty.id }}_{{ row.study_semester }}" class="form-select">
+                                                <option value="">Выберите учебный план</option>
+
+                                                {% for curriculum in row.available_curriculums %}
+                                                    <option value="{{ curriculum.id }}" {% if row.curriculum.id == curriculum.id %}selected{% endif %}>
+                                                        {{ curriculum.name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        {% else %}
+                                            <span class="text-muted">Нет утверждённых учебных планов</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center">
+                                        Для этого семестра нет подходящих групп
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if curriculum_rows.has_other_pages %}
+                    <nav aria-label="Навигация по учебным планам семестра" class="mt-3">
+                        <ul class="pagination justify-content-center">
+
+                            {% if curriculum_rows.has_previous %}
+                                <li class="page-item">
+                                    <button type="submit" name="page" value="{{ curriculum_rows.previous_page_number }}" class="page-link">
+                                        Назад
+                                    </button>
+                                </li>
+                            {% endif %}
+
+                            {% for page_number in page_range %}
+
+                                {% if page_number == ellipsis %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">{{ page_number }}</span>
+                                    </li>
+
+                                {% elif page_number == curriculum_rows.number %}
+                                    <li class="page-item active" aria-current="page">
+                                        <span class="page-link">{{ page_number }}</span>
+                                    </li>
+
+                                {% else %}
+                                    <li class="page-item">
+                                        <button type="submit" name="page" value="{{ page_number }}" class="page-link">
+                                            {{ page_number }}
+                                        </button>
+                                    </li>
+                                {% endif %}
+
+                            {% endfor %}
+
+                            {% if curriculum_rows.has_next %}
+                                <li class="page-item">
+                                    <button type="submit" name="page" value="{{ curriculum_rows.next_page_number }}" class="page-link">
+                                        Вперёд
+                                    </button>
+                                </li>
+                            {% endif %}
+
+                        </ul>
+                    </nav>
+                {% endif %}
+
+             </form>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+
+            {% if is_editable %}
+
+                {% if curriculum_rows %}
+                    <button type="submit" form="semesterCurriculumsForm" name="save" value="1" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Сохранить выбранные
+                    </button>
+                {% endif %}
+
+                <form method="post" action="{% url 'admin_semester_prepare' semester.id %}" class="d-inline">
+                    {% csrf_token %}
+
+                    <button type="submit" class="btn btn-success" {% if not can_prepare %}disabled{% endif %} onclick="return confirm('Подготовить семестр? После этого изменить состав дисциплин будет нельзя.')">
+                        <i class="bi bi-check-circle"></i> Подготовить семестр
+                    </button>
+                </form>
+            {% endif %}
+
+            <a href="{% url 'admin_semesters' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Назад
+            </a>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

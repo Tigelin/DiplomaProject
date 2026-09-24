@@ -3,9 +3,9 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from .models import (
     Department, Group, Teacher, Student, DisciplinePlan, Discipline,
-    Classroom, Schedule, Lesson, LessonType, Task, LessonFile,
+    Classroom, Schedule, Lesson, LessonType, TaskType, Task, LessonFile,
     Grade, Attendance, AttendanceType, ContactMessage, MessageStatus,
-    Specialty
+    Specialty, GroupNumberSet, GroupNumberEntry
 )
 
 
@@ -48,24 +48,39 @@ class DepartmentAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
         }
 
 
+class GroupNumberEntryInline(admin.TabularInline):
+    model = GroupNumberEntry
+    extra = 1
+
+
+@admin.register(GroupNumberSet)
+class GroupNumberSetAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'specialty')
+    list_filter = ('specialty',)
+    search_fields = ('name', 'specialty__name')
+    inlines = [GroupNumberEntryInline]
+
+
 @admin.register(Group)
 class GroupAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
-    list_display = ('id', 'name', 'year', 'specialty', 'get_department')
-    list_filter = ('year', 'specialty')
-    search_fields = ('name',)
+    list_display = ('id', 'name', 'year', 'specialty', 'number_set', 'is_graduated', 'get_department')
+    list_filter = ('year', 'specialty', 'number_set', 'is_graduated')
+    search_fields = ('name', 'number_set__name')
 
     def get_department(self, obj):
         return obj.specialty.department.name
     get_department.short_description = 'Отделение'
 
     def get_add_url_with_data(self, request, obj):
-        return f"{reverse('admin:journal_group_add')}?name={obj.name}&year={obj.year}&specialty={obj.specialty.id}"
+        return f"{reverse('admin:journal_group_add')}?name={obj.name}&year={obj.year}&specialty={obj.specialty.id}&number_set={obj.number_set.id}&is_graduated={obj.is_graduated}"
 
     def get_changeform_initial_data(self, request):
         return {
             'name': request.GET.get('name'),
             'year': request.GET.get('year'),
             'specialty': request.GET.get('specialty'),
+            'number_set': request.GET.get('number_set'),
+            'is_graduated': request.GET.get('is_graduated'),
         }
 
 
@@ -107,16 +122,29 @@ class StudentAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
 
 @admin.register(DisciplinePlan)
 class DisciplinePlanAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
-    list_display = ('id', 'name', 'total_hours')
+    list_display = ('id', 'name', 'total_hours', 'is_approved', 'is_archived')
+    list_filter = ('is_approved', 'is_archived')
     search_fields = ('name',)
+    actions = None
+
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.is_approved:
+            return ('name', 'total_hours', 'is_approved', 'is_archived')
+        return ('is_archived',)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.is_approved:
+            return False
+        return super().has_delete_permission(request, obj)
 
     def get_add_url_with_data(self, request, obj):
-        return f"{reverse('admin:journal_disciplineplan_add')}?name={obj.name}&total_hours={obj.total_hours}"
+        return f"{reverse('admin:journal_disciplineplan_add')}?name={obj.name}&total_hours={obj.total_hours}&is_approved={obj.is_approved}"
 
     def get_changeform_initial_data(self, request):
         return {
             'name': request.GET.get('name'),
             'total_hours': request.GET.get('total_hours'),
+            'is_approved': request.GET.get('is_approved'),
         }
 
 
@@ -203,18 +231,37 @@ class LessonTypeAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
         }
 
 
-@admin.register(Task)
-class TaskAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
-    list_display = ('id', 'name', 'lesson')
-    list_filter = ('lesson__schedule__discipline__group',)
-    search_fields = ('name',)
+@admin.register(TaskType)
+class TaskTypeAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
+    list_display = ('id', 'name', 'abbreviation')
+    search_fields = ('name', 'abbreviation')
 
     def get_add_url_with_data(self, request, obj):
-        return f"{reverse('admin:journal_task_add')}?name={obj.name}&lesson={obj.lesson.id}"
+        return (
+            f"{reverse('admin:journal_tasktype_add')}"
+            f"?name={obj.name}&abbreviation={obj.abbreviation}"
+        )
 
     def get_changeform_initial_data(self, request):
         return {
             'name': request.GET.get('name'),
+            'abbreviation': request.GET.get('abbreviation'),
+        }
+
+
+@admin.register(Task)
+class TaskAdmin(SaveAndAddAnotherMixin, admin.ModelAdmin):
+    list_display = ('id', 'name', 'task_type', 'lesson')
+    list_filter = ('task_type', 'lesson__schedule__discipline__group')
+    search_fields = ('name', 'task_type__name', 'task_type__abbreviation')
+
+    def get_add_url_with_data(self, request, obj):
+        return f"{reverse('admin:journal_task_add')}?name={obj.name}&task_type={obj.task_type.id}&lesson={obj.lesson.id}"
+
+    def get_changeform_initial_data(self, request):
+        return {
+            'name': request.GET.get('name'),
+            'task_type': request.GET.get('task_type'),
             'lesson': request.GET.get('lesson'),
         }
 

@@ -18,7 +18,26 @@
     </div>
     <div class="card-body">
 
+        {% if semesters %}
+
+            <form method="get" class="mb-4">
+                <label class="form-label">Выберите учебный семестр:</label>
+                <select name="semester_id" class="form-select" onchange="this.form.submit()">
+                    {% for semester in semesters %}
+                        <option value="{{ semester.id }}" {% if selected_semester.id == semester.id %}selected{% endif %}>
+                            {{ semester }} — {{ semester.status.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+
+        {% endif %}
+
         <form method="get" class="mb-4">
+            {% if selected_semester %}
+                <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+            {% endif %}
+
             <div class="row g-2">
                 <div class="col-md-8">
                     <input
@@ -58,7 +77,7 @@
                                 {{ discipline.plan.name }}
                             </a>
                         </td>
-                        <td>{{ discipline.group.name }}</td>
+                        <td>{{ discipline.group.display_name }}</td>
                         <td>{{ discipline.actual_hours|default_if_none:"0" }} ч.</td>
                         <td>{{ discipline.plan.total_hours }} ч.</td>
                         <td>
@@ -72,7 +91,7 @@
 
                     <tr>
                         <td colspan="5" class="text-center">
-                            Дисциплины не найдены.
+                            Дисциплины за выбранный семестр не найдены.
                         </td>
                     </tr>
 
@@ -90,7 +109,7 @@
                 {% if disciplines.has_previous %}
 
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ disciplines.previous_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                    <a class="page-link" href="?page={{ disciplines.previous_page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if search %}&search={{ search|urlencode }}{% endif %}">
                         Назад
                     </a>
                 </li>
@@ -114,7 +133,7 @@
                     {% else %}
 
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                        <a class="page-link" href="?page={{ page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if search %}&search={{ search|urlencode }}{% endif %}">
                             {{ page_number }}
                         </a>
                     </li>
@@ -126,7 +145,7 @@
                 {% if disciplines.has_next %}
 
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ disciplines.next_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                    <a class="page-link" href="?page={{ disciplines.next_page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if search %}&search={{ search|urlencode }}{% endif %}">
                         Вперёд
                     </a>
                 </li>

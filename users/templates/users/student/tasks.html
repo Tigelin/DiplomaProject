@@ -17,173 +17,208 @@
         <h4 class="mb-0"><i class="bi bi-card-list"></i> Мои задания</h4>
     </div>
     <div class="card-body">
+        {% if semesters %}
 
-        <form method="get" class="row g-3 mb-4" id="filterForm">
-            <div class="col-md-4">
-                <label class="form-label">Дисциплина:</label>
-                <select name="discipline_id" class="form-select" onchange="this.form.submit()">
-                    <option value="">-- Все дисциплины --</option>
-
-                    {% for discipline in disciplines %}
-
-                        <option value="{{ discipline.id }}" {% if selected_discipline_id == discipline.id|stringformat:"s" %}selected{% endif %}>
-                            {{ discipline.plan.name }}
+            <form method="get" class="mb-4">
+                <label class="form-label">Выберите учебный семестр:</label>
+                <select name="semester_id" class="form-select" onchange="this.form.submit()">
+                    {% for semester in semesters %}
+                        <option value="{{ semester.id }}" {% if selected_semester.id == semester.id %}selected{% endif %}>
+                            {{ semester }} — {{ semester.status.name }}
                         </option>
-
                     {% endfor %}
-
                 </select>
-            </div>
+            </form>
 
-            <div class="col-md-4 d-flex align-items-end">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" name="show_all" id="show_all" value="true" {% if show_all %}checked{% endif %} onchange="this.form.submit()">
-                    <label class="form-check-label" for="show_all">
-                        Показать все задания (включая сданные)
-                    </label>
+        {% endif %}
+
+        {% if selected_semester %}
+
+            <form method="get" class="row g-3 mb-4" id="filterForm">
+                <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+                <div class="col-md-4">
+                    <label class="form-label">Дисциплина:</label>
+                    <select name="discipline_id" class="form-select" onchange="this.form.submit()">
+                        <option value="">-- Все дисциплины --</option>
+
+                        {% for discipline in disciplines %}
+
+                            <option value="{{ discipline.id }}" {% if selected_discipline_id == discipline.id|stringformat:"s" %}selected{% endif %}>
+                                {{ discipline.plan.name }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
                 </div>
+
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="show_all" id="show_all" value="true" {% if show_all %}checked{% endif %} onchange="this.form.submit()">
+                        <label class="form-check-label" for="show_all">
+                            Показать все задания (включая сданные)
+                        </label>
+                    </div>
+                </div>
+            </form>
+
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                Найдено заданий: <strong>{{ tasks_with_status.paginator.count }}</strong>
+
+                {% if not show_all %}
+
+                    (только несданные)
+
+                {% else %}
+
+                    (все)
+
+                {% endif %}
+
             </div>
-        </form>
 
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i>
-            Найдено заданий: <strong>{{ tasks_with_status.paginator.count }}</strong>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Дисциплина</th>
+                            <th>Задание</th>
+                            <th>Тема занятия</th>
+                            <th>Преподаватель</th>
+                            <th>Дата занятия</th>
+                            <th>Оценка</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody>
 
-            {% if not show_all %}
+                        {% for item in tasks_with_status %}
 
-                (только несданные)
+                            <tr class="{% if not item.is_completed %}table-danger{% endif %}">
+                                <td>{{ item.task.lesson.schedule.discipline.plan.name }}</td>
+                                <td>
+                                    <a href="{% url 'lesson_detail' item.task.lesson.id %}?from=tasks&semester_id={{ selected_semester.id }}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}&page={{ tasks_with_status.number }}" class="text-decoration-none">
+                                        <strong>{{ item.task.name }}</strong>
+                                    </a>
+                                </td>
+                                <td>{{ item.task.lesson.topic|default:"—" }}</td>
+                                <td>{{ item.task.lesson.schedule.discipline.teacher.user.get_full_name }}</td>
+                                <td>{{ item.task.lesson.schedule.date|date:"d.m.Y" }}</td>
+                                <td>
+                                    {% if item.grade == 1 %}
 
-            {% else %}
+                                        <span class="text-danger" title="Оценка: 1">●</span>
 
-                (все)
+                                    {% elif item.grade %}
 
-            {% endif %}
+                                        <span class="badge
+                                            {% if item.grade == 5 %}bg-dark-green
+                                            {% elif item.grade == 4 %}bg-success
+                                            {% elif item.grade == 3 %}bg-warning text-dark
+                                            {% elif item.grade == 2 %}bg-danger
+                                            {% endif %}">
+                                            {{ item.grade }}
+                                        </span>
 
-        </div>
+                                    {% else %}
 
-        <div class="table-responsive">
-            <table class="table table-striped table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Дисциплина</th>
-                        <th>Задание</th>
-                        <th>Тема занятия</th>
-                        <th>Преподаватель</th>
-                        <th>Дата занятия</th>
-                        <th>Оценка</th>
-                        <th>Статус</th>
-                    </tr>
-                </thead>
-                <tbody>
+                                        <span class="text-muted">—</span>
 
-                    {% for item in tasks_with_status %}
+                                    {% endif %}
+                                </td>
+                                <td>
 
-                        <tr class="{% if not item.is_completed %}table-danger{% endif %}">
-                            <td>{{ item.task.lesson.schedule.discipline.plan.name }}</td>
-                            <td>
-                                <a href="{% url 'lesson_detail' item.task.lesson.id %}?from=tasks" class="text-decoration-none">
-                                    <strong>{{ item.task.name }}</strong>
-                                </a>
-                            </td>
-                            <td>{{ item.task.lesson.topic|default:"—" }}</td>
-                            <td>{{ item.task.lesson.schedule.discipline.teacher.user.get_full_name }}</td>
-                            <td>{{ item.task.lesson.schedule.date|date:"d.m.Y" }}</td>
-                            <td>
-                                {% if item.grade == 1 %}
+                                    {% if item.is_completed %}
 
-                                    <span class="text-danger" title="Оценка: 1">●</span>
+                                        <span class="badge bg-success">Сдано</span>
 
-                                {% else %}
+                                    {% else %}
 
-                                    <span class="badge
-                                        {% if item.grade == 5 %}bg-dark-green
-                                        {% elif item.grade == 4 %}bg-success
-                                        {% elif item.grade == 3 %}bg-warning text-dark
-                                        {% elif item.grade == 2 %}bg-danger
-                                        {% else %}bg-dark text-white
-                                        {% endif %}">
-                                        {{ item.grade }}
-                                    </span>
+                                        <span class="badge bg-danger">Не сдано</span>
 
-                                {% endif %}
-                            </td>
-                            <td>
-
-                                {% if item.is_completed %}
-
-                                    <span class="badge bg-success">Сдано</span>
-
-                                {% else %}
-
-                                    <span class="badge bg-danger">Не сдано</span>
-
-                                {% endif %}
+                                    {% endif %}
 
                             </tr>
-                        </tr>
 
-                    {% endfor %}
+                            {% empty %}
 
-                </tbody>
-            </table>
-        </div>
+                                <tr>
+                                    <td colspan="7" class="text-center">
+                                        Задания по выбранным условиям не найдены.
+                                    </td>
+                                </tr>
 
-        {% if tasks_with_status.has_other_pages %}
+                        {% endfor %}
 
-            <nav aria-label="Навигация по страницам заданий" class="mt-3">
-                <ul class="pagination justify-content-center">
+                    </tbody>
+                </table>
+            </div>
 
-                    {% if tasks_with_status.has_previous %}
+            {% if tasks_with_status.has_other_pages %}
 
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ tasks_with_status.previous_page_number }}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
-                            Назад
-                        </a>
-                    </li>
+                <nav aria-label="Навигация по страницам заданий" class="mt-3">
+                    <ul class="pagination justify-content-center">
 
-                    {% endif %}
-
-                    {% for page_number in page_range %}
-
-                        {% if page_number == ellipsis %}
-
-                        <li class="page-item disabled">
-                            <span class="page-link">{{ page_number }}</span>
-                        </li>
-
-                        {% elif page_number == tasks_with_status.number %}
-
-                        <li class="page-item active" aria-current="page">
-                            <span class="page-link">{{ page_number }}</span>
-                        </li>
-
-                        {% else %}
+                        {% if tasks_with_status.has_previous %}
 
                         <li class="page-item">
-                            <a class="page-link" href="?page={{ page_number }}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
-                                {{ page_number }}
+                            <a class="page-link" href="?page={{ tasks_with_status.previous_page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
+                                Назад
                             </a>
                         </li>
 
                         {% endif %}
 
-                    {% endfor %}
+                        {% for page_number in page_range %}
 
-                    {% if tasks_with_status.has_next %}
+                            {% if page_number == ellipsis %}
 
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ tasks_with_status.next_page_number }}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
-                            Вперёд
-                        </a>
-                    </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">{{ page_number }}</span>
+                            </li>
 
-                    {% endif %}
+                            {% elif page_number == tasks_with_status.number %}
 
-                </ul>
-            </nav>
+                            <li class="page-item active" aria-current="page">
+                                <span class="page-link">{{ page_number }}</span>
+                            </li>
+
+                            {% else %}
+
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
+                                    {{ page_number }}
+                                </a>
+                            </li>
+
+                            {% endif %}
+
+                        {% endfor %}
+
+                        {% if tasks_with_status.has_next %}
+
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ tasks_with_status.next_page_number }}{% if selected_semester %}&semester_id={{ selected_semester.id }}{% endif %}{% if selected_discipline_id %}&discipline_id={{ selected_discipline_id }}{% endif %}{% if show_all %}&show_all=true{% endif %}">
+                                Вперёд
+                            </a>
+                        </li>
+
+                        {% endif %}
+
+                    </ul>
+                </nav>
+
+            {% endif %}
+
+        {% else %}
+
+            <div class="alert alert-info text-center">
+                <i class="bi bi-info-circle"></i>
+                Нет доступных учебных семестров.
+            </div>
 
         {% endif %}
-
     </div>
 </div>
 

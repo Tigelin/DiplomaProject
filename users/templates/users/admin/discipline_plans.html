@@ -15,13 +15,28 @@
 <div class="card">
     <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
         <h4 class="mb-0"><i class="bi bi-book"></i> Управление планами дисциплин</h4>
-        <a href="{% url 'admin_discipline_plan_create' %}" class="btn btn-light btn-sm">
-            <i class="bi bi-plus"></i> Добавить
-        </a>
+        <div>
+            {% if show_archived %}
+                <a href="{% url 'admin_discipline_plans' %}" class="btn btn-light btn-sm">
+                    Только активные
+                </a>
+            {% else %}
+                <a href="?show_archived=1" class="btn btn-light btn-sm">
+                    Показать все
+                </a>
+            {% endif %}
+            <a href="{% url 'admin_discipline_plan_create' %}" class="btn btn-light btn-sm">
+                <i class="bi bi-plus"></i> Добавить
+            </a>
+        </div>
     </div>
     <div class="card-body">
         
         <form method="get" class="mb-4">
+            {% if show_archived %}
+                <input type="hidden" name="show_archived" value="1">
+            {% endif %}
+
             <div class="row g-2">
                 <div class="col-md-8">
                     <input type="text" name="search" class="form-control" placeholder="Поиск по названию..." value="{{ search }}">
@@ -40,6 +55,7 @@
                     <tr>
                         <th>Название</th>
                         <th>Часы</th>
+                        <th>Статус</th>
                         <th>Действия</th>
                     </tr>
                 </thead>
@@ -50,17 +66,42 @@
                         <td>{{ plan.name }}</td>
                         <td>{{ plan.total_hours }} ч.</td>
                         <td>
-                            <a href="{% url 'admin_discipline_plan_edit' plan.id %}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-pencil"></i>
-                            </a>
-                            <a href="{% url 'admin_discipline_plan_delete' plan.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить план?')">
-                                <i class="bi bi-trash"></i>
-                            </a>
+                            {% if plan.is_archived %}
+                                <span class="badge bg-dark">Архив</span>
+                            {% elif plan.is_approved %}
+                                <span class="badge bg-success">Утверждён</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Черновик</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if plan.is_archived %}
+                                <form method="post" action="{% url 'admin_discipline_plan_archive' plan.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Восстановить">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </button>
+                                </form>
+                            {% elif plan.is_approved %}
+                                <form method="post" action="{% url 'admin_discipline_plan_archive' plan.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="В архив" onclick="return confirm('Отправить план в архив?')">
+                                        <i class="bi bi-archive"></i>
+                                    </button>
+                                </form>
+                            {% else %}
+                                <a href="{% url 'admin_discipline_plan_edit' plan.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'admin_discipline_plan_delete' plan.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить план?')">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="text-center">Нет записей</td>
+                        <td colspan="4" class="text-center">Нет записей</td>
                     </tr>
                     {% endfor %}
                     
@@ -75,7 +116,7 @@
 
                 {% if plans.has_previous %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ plans.previous_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                    <a class="page-link" href="?page={{ plans.previous_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}{% if show_archived %}&show_archived=1{% endif %}">
                         Назад
                     </a>
                 </li>
@@ -95,7 +136,7 @@
 
                     {% else %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                        <a class="page-link" href="?page={{ page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}{% if show_archived %}&show_archived=1{% endif %}">
                             {{ page_number }}
                         </a>
                     </li>
@@ -105,7 +146,7 @@
 
                 {% if plans.has_next %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ plans.next_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}">
+                    <a class="page-link" href="?page={{ plans.next_page_number }}{% if search %}&search={{ search|urlencode }}{% endif %}{% if show_archived %}&show_archived=1{% endif %}">
                         Вперёд
                     </a>
                 </li>
