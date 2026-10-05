@@ -8,7 +8,7 @@ from django.contrib import messages
 from .models import (
     Teacher, Department, Group, Discipline,
     Specialty, Schedule, ContactMessage, MessageStatus,
-    DisciplinePlan, AcademicSemester
+    DisciplinePlan, AcademicSemester, Student
 )
 from django.db.models import Q
 from django.core.paginator import Paginator
@@ -297,6 +297,23 @@ def schedule_list(request):
             groups,
             id=group_id
         )
+    elif selected_semester and request.user.is_authenticated:
+        try:
+            student = request.user.student
+        except Student.DoesNotExist:
+            pass
+        else:
+            membership = student.group_memberships.filter(
+                start_date__lte=selected_semester.end_date
+            ).filter(
+                Q(end_date__isnull=True) |
+                Q(end_date__gte=selected_semester.start_date)
+            ).order_by('-start_date').first()
+
+            if membership:
+                selected_group = groups.filter(
+                    id=membership.group_id
+                ).first()
 
     groups = list(groups)
     for group in groups:
